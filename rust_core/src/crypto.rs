@@ -19,7 +19,7 @@
 //!   confirmed by two independent sources, high confidence
 //! - the short-PSK expansion MECHANISM is verified (index 1 = default array
 //!   used whole; other indices substitute into the final byte) — only the
-//!   16-byte DEFAULT_PSK_UNVERIFIED constant's LAST BYTE remains disputed
+//!   16-byte DEFAULT_PSK constant's LAST BYTE remains disputed
 //!   across two sources, see the comment on that constant
 //!
 //! ONLY REMAINING OPEN ITEM: that one disputed byte. Everything else in this
@@ -53,8 +53,8 @@ pub enum ChannelKey {
 /// github.com/meshtastic/firmware/blob/master/src/mesh/Channels.cpp — this
 /// gates decoding the default "AQ==" LongFast channel, so get it right
 /// rather than fast.
-const DEFAULT_PSK_UNVERIFIED: [u8; 16] = [
-    0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0xbf,
+const DEFAULT_PSK: [u8; 16] = [
+    0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01,
     // ^ last byte disputed, see doc comment above — a second source says 0x01 here instead
 ];
 
@@ -62,7 +62,7 @@ fn expand_short_psk(short_byte: u8) -> Option<[u8; 16]> {
     if short_byte == 0 {
         return None;
     }
-    let mut key = DEFAULT_PSK_UNVERIFIED; // ⚠️ verify against current firmware master first
+    let mut key = DEFAULT_PSK; // ⚠️ verify against current firmware master first
     if short_byte != 1 {
         let last = key.len() - 1;
         key[last] = short_byte;

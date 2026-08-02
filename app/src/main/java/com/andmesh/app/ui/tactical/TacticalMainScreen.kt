@@ -6,7 +6,7 @@
 // beides freie Google Fonts). Bundled statt Downloadable Fonts gewählt, damit keine
 // Play-Services-Cert-Hashes gepflegt werden müssen.
 
-package com.hans.meshsdr.ui.tactical
+package com.andmesh.app.ui.tactical
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// import com.hans.meshsdr.R  // für R.font.* — einkommentieren im echten Projekt
+import com.andmesh.app.R  // für R.font.* — einkommentieren im echten Projekt
 
 // ---- Design-Tokens: "Aussehen #2 — Tactical/MilSpec" ----
 object TacticalColors {
@@ -40,8 +40,8 @@ object TacticalColors {
 // val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
 // val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
 // Platzhalter bis res/font/ bestückt ist, damit die Datei für sich betrachtbar bleibt:
-val StencilFontFamily = FontFamily.SansSerif
-val CondensedFontFamily = FontFamily.SansSerif
+val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
+val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
 
 data class MeshNode(val name: String, val hopsLabel: String)
 
