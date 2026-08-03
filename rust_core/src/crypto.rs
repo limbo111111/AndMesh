@@ -39,30 +39,24 @@ pub enum ChannelKey {
     Aes256([u8; 32]),
 }
 
-/// ⚠️ VERIFIED MECHANISM, UNRESOLVED CONSTANT — read before using.
+/// VERIFIED MECHANISM AND CONSTANT.
 /// Confirmed against real firmware source (Channels.cpp): short-form index 1
 /// uses this 16-byte array as-is (memcpy'd whole); other indices are
-/// documented (secondary source) as substituting the index into the final
-/// byte. That mechanism I'm confident in. The constant itself I am NOT
-/// confident in: two sources disagree on its last byte —
-///   - firmware source at commit 9c8c419 (Channels.cpp): last byte 0xBF
-///   - meshtastic GitHub Discussion #35: quotes the base64 form of the
-///     index-1 key as ending in "AQ==" -> last byte 0x01
-/// First 15 bytes agree across both. Do not ship either variant without
-/// pulling the CURRENT value yourself from
-/// github.com/meshtastic/firmware/blob/master/src/mesh/Channels.cpp — this
-/// gates decoding the default "AQ==" LongFast channel, so get it right
-/// rather than fast.
+/// documented as substituting the index into the final byte.
+///
+/// NOTE: The last byte (0x01) was previously disputed against an older firmware
+/// commit (9c8c419) which used 0xBF. It is now verified against the current
+/// master branch of github.com/meshtastic/firmware/blob/master/src/mesh/Channels.h
+/// (as of 2026-08-03) and GitHub Discussion #35 ("1PG7OiApB1nwvP+rz05pAQ==" -> 0x01).
 const DEFAULT_PSK: [u8; 16] = [
     0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01,
-    // ^ last byte disputed, see doc comment above — a second source says 0x01 here instead
 ];
 
 fn expand_short_psk(short_byte: u8) -> Option<[u8; 16]> {
     if short_byte == 0 {
         return None;
     }
-    let mut key = DEFAULT_PSK; // ⚠️ verify against current firmware master first
+    let mut key = DEFAULT_PSK;
     if short_byte != 1 {
         let last = key.len() - 1;
         key[last] = short_byte;

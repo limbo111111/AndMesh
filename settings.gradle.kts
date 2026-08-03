@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "AndMesh"
 include(":app")
+include(":rust_core")

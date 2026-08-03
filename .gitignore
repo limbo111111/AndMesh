@@ -1,1 +1,9 @@
 rust_core/target/
+
+app/build/
+.gradle/
+target/
+local.properties
+rust_core/target/
+app/src/main/jniLibs/
+rust_core/build/
