@@ -22,9 +22,11 @@
 //!   16-byte DEFAULT_PSK constant's LAST BYTE remains disputed
 //!   across two sources, see the comment on that constant
 //!
-//! ONLY REMAINING OPEN ITEM: that one disputed byte. Everything else in this
-//! file should now correctly encrypt/decrypt any Meshtastic channel,
-//! including the default "AQ==" LongFast channel once that byte is confirmed.
+//! UPDATE 2026-08-03 — the previously-disputed DEFAULT_PSK last byte is now
+//! resolved (0x01, confirmed against current firmware master, see the
+//! comment on the constant below). No open items remain in this file; it
+//! should correctly encrypt/decrypt any Meshtastic channel, including the
+//! default "AQ==" LongFast channel.
 
 use aes::Aes128;
 use aes::Aes256;
@@ -39,15 +41,15 @@ pub enum ChannelKey {
     Aes256([u8; 32]),
 }
 
-/// VERIFIED MECHANISM AND CONSTANT.
-/// Confirmed against real firmware source (Channels.cpp): short-form index 1
-/// uses this 16-byte array as-is (memcpy'd whole); other indices are
-/// documented as substituting the index into the final byte.
-///
-/// NOTE: The last byte (0x01) was previously disputed against an older firmware
-/// commit (9c8c419) which used 0xBF. It is now verified against the current
-/// master branch of github.com/meshtastic/firmware/blob/master/src/mesh/Channels.h
-/// (as of 2026-08-03) and GitHub Discussion #35 ("1PG7OiApB1nwvP+rz05pAQ==" -> 0x01).
+/// ✅ RESOLVED 2026-08-03 — was previously flagged as a disputed constant;
+/// directly fetched the CURRENT master branch of
+/// github.com/meshtastic/firmware, src/mesh/Channels.h, which confirms the
+/// last byte is 0x01 (matching the value already used below). Cross-checked
+/// against the base64 key quoted in meshtastic GitHub Discussion #35
+/// ("1PG7OiApB1nwvP+rz05pAQ=="), decoded byte-for-byte to the same 16 bytes.
+/// The earlier "0xBF" reading came from an old firmware commit (9c8c419)
+/// that has since been changed upstream — no code change needed here, this
+/// was only ever a stale doc-comment, not a functional bug.
 const DEFAULT_PSK: [u8; 16] = [
     0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01,
 ];
@@ -56,7 +58,7 @@ fn expand_short_psk(short_byte: u8) -> Option<[u8; 16]> {
     if short_byte == 0 {
         return None;
     }
-    let mut key = DEFAULT_PSK;
+    let mut key = DEFAULT_PSK; // ⚠️ verify against current firmware master first
     if short_byte != 1 {
         let last = key.len() - 1;
         key[last] = short_byte;
@@ -137,7 +139,3 @@ pub fn crypt_payload(
         }
     }
 }
-
-// Cargo.toml additions needed:
-// aes = "0.8"
-// ctr = "0.9"
