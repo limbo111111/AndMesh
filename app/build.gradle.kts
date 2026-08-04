@@ -36,6 +36,9 @@ android {
     }
 }
 
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
+    .configureEach { dependsOn(":rust_core:cargoBuild") }
+
 dependencies {
     implementation(project(":rust_core"))
     implementation("androidx.core:core-ktx:1.10.1")
