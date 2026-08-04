@@ -48,9 +48,3 @@ val cargoBuild = tasks.register<Exec>("cargoBuild") {
     }
 }
 
-// Attach the cargo build task to Android's task graph
-tasks.whenTaskAdded {
-    if (name.startsWith("merge") && name.endsWith("JniLibFolders")) {
-        dependsOn(cargoBuild)
-    }
-}
