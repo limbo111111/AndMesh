@@ -1,0 +1,182 @@
+WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 34
+
+This Android Gradle plugin (8.1.0) was tested up to compileSdk = 33 (and compileSdkPreview = "UpsideDownCakePrivacySandbox").
+
+You are strongly encouraged to update your project to use a newer
+Android Gradle plugin that has been tested with compileSdk = 34.
+
+If you are already using the latest version of the Android Gradle plugin,
+you may need to wait until a newer version with support for compileSdk = 34 is available.
+
+To suppress this warning, add/update
+    android.suppressUnsupportedCompileSdk=34
+to this project's gradle.properties.
+> Task :app:clean
+> Task :rust_core:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :rust_core:preBuild UP-TO-DATE
+> Task :rust_core:preDebugBuild UP-TO-DATE
+> Task :rust_core:writeDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :rust_core:generateDebugResValues
+> Task :rust_core:generateDebugResources
+> Task :app:checkDebugAarMetadata
+> Task :rust_core:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:parseDebugLocalResources
+> Task :app:extractDeepLinksDebug
+> Task :rust_core:extractDeepLinksDebug
+> Task :rust_core:compileDebugLibraryResources
+> Task :rust_core:processDebugManifest
+> Task :app:mergeDebugResources
+> Task :rust_core:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :rust_core:javaPreCompileDebug
+> Task :app:javaPreCompileDebug
+> Task :rust_core:generateDebugRFile
+> Task :app:mergeDebugShaders
+> Task :rust_core:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :rust_core:bundleLibCompileToJarDebug
+> Task :rust_core:mergeDebugShaders
+> Task :rust_core:compileDebugShaders NO-SOURCE
+> Task :rust_core:generateDebugAssets UP-TO-DATE
+> Task :rust_core:packageDebugAssets
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :rust_core:processDebugJavaRes NO-SOURCE
+> Task :app:processDebugManifestForPackage
+> Task :app:checkDebugDuplicateClasses
+> Task :app:desugarDebugFileDependencies
+> Task :rust_core:bundleLibRuntimeToJarDebug
+> Task :rust_core:bundleLibRuntimeToDirDebug
+> Task :app:processDebugResources
+
+> Task :rust_core:cargoBuild
+Building Rust core module for Android using cargo-ndk...
+    Building arm64-v8a (aarch64-linux-android)
+warning: unused import: `jni::sys::jbyteArray`
+ --> src/lib.rs:7:5
+  |
+7 | use jni::sys::jbyteArray;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `env`
+  --> src/lib.rs:11:5
+   |
+11 |     env: JNIEnv,
+   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rust_core` (lib) generated 2 warnings (run `cargo fix --lib -p rust_core` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.11s
+    Building armeabi-v7a (armv7-linux-androideabi)
+warning: unused import: `jni::sys::jbyteArray`
+ --> src/lib.rs:7:5
+  |
+7 | use jni::sys::jbyteArray;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `env`
+  --> src/lib.rs:11:5
+   |
+11 |     env: JNIEnv,
+   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rust_core` (lib) generated 2 warnings (run `cargo fix --lib -p rust_core` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.07s
+    Building x86 (i686-linux-android)
+warning: unused import: `jni::sys::jbyteArray`
+ --> src/lib.rs:7:5
+  |
+7 | use jni::sys::jbyteArray;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `env`
+  --> src/lib.rs:11:5
+   |
+11 |     env: JNIEnv,
+   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rust_core` (lib) generated 2 warnings (run `cargo fix --lib -p rust_core` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.07s
+    Building x86_64 (x86_64-linux-android)
+warning: unused import: `jni::sys::jbyteArray`
+ --> src/lib.rs:7:5
+  |
+7 | use jni::sys::jbyteArray;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `env`
+  --> src/lib.rs:11:5
+   |
+11 |     env: JNIEnv,
+   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rust_core` (lib) generated 2 warnings (run `cargo fix --lib -p rust_core` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.07s
+     Copying libraries to /app/app/src/main/jniLibs
+
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :rust_core:mergeDebugJniLibFolders
+> Task :rust_core:mergeDebugNativeLibs NO-SOURCE
+> Task :rust_core:copyDebugJniLibsProjectOnly
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:mergeDebugNativeLibs
+> Task :rust_core:stripDebugDebugSymbols NO-SOURCE
+> Task :rust_core:copyDebugJniLibsProjectAndLocalJars
+> Task :rust_core:extractDebugAnnotations
+> Task :rust_core:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :rust_core:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :rust_core:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :rust_core:prepareDebugArtProfile UP-TO-DATE
+> Task :rust_core:prepareLintJarForPublish UP-TO-DATE
+> Task :app:stripDebugDebugSymbols
+> Task :rust_core:mergeDebugJavaResource
+> Task :rust_core:syncDebugLibJars
+> Task :rust_core:bundleDebugAar
+> Task :rust_core:assembleDebug
+> Task :app:mergeExtDexDebug
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.6/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 17s
+62 actionable tasks: 57 executed, 5 up-to-date
