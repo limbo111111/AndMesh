@@ -58,7 +58,7 @@ fn expand_short_psk(short_byte: u8) -> Option<[u8; 16]> {
     if short_byte == 0 {
         return None;
     }
-    let mut key = DEFAULT_PSK; // ⚠️ verify against current firmware master first
+    let mut key = DEFAULT_PSK;
     if short_byte != 1 {
         let last = key.len() - 1;
         key[last] = short_byte;
@@ -81,7 +81,7 @@ pub fn channel_hash(channel_name: &str, psk_bytes: &[u8]) -> u8 {
 
 /// Resolves raw PSK bytes (as configured on a Channel) into a usable key.
 /// psk_bytes.len() is 32 (AES256), 16 (AES128), 1 (short form, needs
-/// expansion — see TODO above), or 0 (channel explicitly unencrypted).
+/// expansion), or 0 (channel explicitly unencrypted).
 pub fn resolve_psk(psk_bytes: &[u8]) -> Option<ChannelKey> {
     match psk_bytes.len() {
         32 => Some(ChannelKey::Aes256(psk_bytes.try_into().ok()?)),
