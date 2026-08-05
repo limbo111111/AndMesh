@@ -52,6 +52,8 @@
 //! for no benefit. HackRF is the TX-capable path (RTL-SDR is RX-only).
 
 use num_complex::Complex32;
+use rustfft::{FftPlanner, FftDirection};
+use std::f32::consts::PI;
 
 pub struct LoraConfig {
     pub spreading_factor: u8, // SF7..SF12; Meshtastic "LongFast" preset = SF11
@@ -131,7 +133,30 @@ pub struct IqBuffer<'a> {
 }
 
 // ============================================================================
-// RF-domain stages — STILL NOT IMPLEMENTED. See file-bottom note for why.
+// DSP Basics
+// ============================================================================
+
+/// Generate a base downchirp (reference chirp) of size N = 2^SF.
+/// Matches [EPFL-RE] eq. 2.2 with S=0 (or [SPAWC20] eq. 1).
+pub fn generate_downchirp(sf: u8) -> Vec<Complex32> {
+    let n = 1_usize << sf;
+    let mut chirp = Vec::with_capacity(n);
+    let n_f32 = n as f32;
+    for i in 0..n {
+        let t = i as f32;
+        // The argument to the complex exponential for the downchirp
+        // [SPAWC20] eq. 1 is x0[n] = exp(j * pi * (n^2 / N - n)).
+        // Using -j for the downchirp (conjugate of upchirp):
+        // Upchirp phase: 2 * pi * ( (t^2)/(2*N) - t/2 ) = pi * (t^2 / N - t)
+        // So downchirp (conjugate): phase = -pi * (t^2 / N - t)
+        let phase = -PI * ( (t * t) / n_f32 - t );
+        chirp.push(Complex32::new(phase.cos(), phase.sin()));
+    }
+    chirp
+}
+
+// ============================================================================
+// RF-domain stages
 // ============================================================================
 
 /// Stage 1 — find the start of a LoRa preamble (repeated upchirps) in a raw
@@ -143,8 +168,80 @@ pub struct IqBuffer<'a> {
 /// fractional STO/CFO); the sync value is the majority vote of those
 /// Npr-1 values. Still `todo!()` because it depends on dechirp_symbols()
 /// (below) actually working, which needs an FFT.
-pub fn detect_preamble(_iq: &IqBuffer, _cfg: &LoraConfig) -> Option<usize> {
-    todo!("needs dechirp_symbols() (FFT) first — see [SPAWC20] §III.B.1 for the exact majority-vote/±1-margin algorithm to implement here")
+pub fn detect_preamble(iq: &IqBuffer, cfg: &LoraConfig) -> Option<usize> {
+    let sf = cfg.spreading_factor;
+    let n = 1_usize << sf;
+    if iq.samples.len() < n * 8 {
+        return None;
+    }
+
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(n);
+
+    // We assume Fs == BW for the algorithm's base rate, though in a real
+    // SDR it might be oversampled. For Meshtastic, we expect 250kHz.
+    // We'll generate a base downchirp for cross-correlation.
+    let base_downchirp = generate_downchirp(sf);
+
+    // [SPAWC20] §III.B.1:
+    // "a preamble is detected once Npr-1 consecutive symbols demodulate within {s-1, s, s+1}"
+    // LoRa preamble has 8 upchirps. Npr-1 = 7.
+    let npr_minus_1 = 7;
+    let mut consecutive_matches = 0;
+    let mut last_peak: Option<usize> = None;
+
+    // Allocate the buffer once outside the loop
+    let mut buffer = vec![Complex32::new(0.0, 0.0); n];
+
+    let mut window = 0;
+    while (window + 1) * n <= iq.samples.len() {
+        let start_idx = window * n;
+
+        for i in 0..n {
+            buffer[i] = iq.samples[start_idx + i] * base_downchirp[i];
+        }
+
+        fft.process(&mut buffer);
+
+        // Find peak bin
+        let mut max_mag = -1.0_f32;
+        let mut peak_bin = 0;
+        for i in 0..n {
+            let mag = buffer[i].norm_sqr();
+            if mag > max_mag {
+                max_mag = mag;
+                peak_bin = i;
+            }
+        }
+
+        if let Some(last) = last_peak {
+            // Check if peak is within ±1 margin (with wrap-around)
+            let diff = (peak_bin as isize - last as isize).abs();
+            let is_match = diff <= 1 || diff >= (n as isize - 1);
+
+            if is_match {
+                consecutive_matches += 1;
+                if consecutive_matches >= npr_minus_1 {
+                    // Backtrack to the start of this preamble train.
+                    // The block-aligned window start is (window - npr_minus_1) * n.
+                    // The `peak_bin` (which corresponds to integer STO) must be factored in to
+                    // align precisely to the start of the upchirp symbol boundary.
+                    // A non-zero peak_bin for an upchirp shifted in time corresponds to a time
+                    // delay of `tau = (n - peak_bin) % n` samples.
+                    let block_start = (window - npr_minus_1) * n;
+                    let tau = (n - peak_bin) % n;
+                    return Some(block_start + tau);
+                }
+            } else {
+                consecutive_matches = 1;
+            }
+        } else {
+            consecutive_matches = 1;
+        }
+        last_peak = Some(peak_bin);
+        window += 1;
+    }
+    None
 }
 
 /// Stage 2 — estimate + correct carrier frequency offset (CFO) and sample
@@ -159,11 +256,68 @@ pub fn detect_preamble(_iq: &IqBuffer, _cfg: &LoraConfig) -> Option<usize> {
 /// real, nontrivial numerical DSP — worth its own dedicated session with a
 /// compiler and a captured IQ file to iterate against, not a blind port.
 pub fn estimate_cfo_sto(
-    _iq: &IqBuffer,
-    _preamble_start: usize,
-    _cfg: &LoraConfig,
+    iq: &IqBuffer,
+    preamble_start: usize,
+    cfg: &LoraConfig,
 ) -> (f32, f32) {
-    todo!("[SPAWC20] eq. 6-9 give the fractional-offset math; the integer-offset split needs Bernier/Xhonneux (refs [13],[14] in that paper) fetched separately")
+    // Fractional CFO/STO estimation via 3-point parabolic interpolation
+    // from [SPAWC20] eq. 6-9.
+    // For a robust implementation we need to FFT at least one preamble upchirp
+    // and one downchirp. Let's use the first upchirp for CFO fraction.
+
+    let sf = cfg.spreading_factor;
+    let n = 1_usize << sf;
+
+    // We need 8 upchirps + 2 sync + 2.25 downchirps minimum
+    if iq.samples.len() < preamble_start + 12 * n {
+        return (0.0, 0.0);
+    }
+
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(n);
+    let base_downchirp = generate_downchirp(sf);
+
+    // Dechirp the very first upchirp of the preamble to find fractional peak
+    let mut buffer = vec![Complex32::new(0.0, 0.0); n];
+    for i in 0..n {
+        buffer[i] = iq.samples[preamble_start + i] * base_downchirp[i];
+    }
+    fft.process(&mut buffer);
+
+    // Find peak bin
+    let mut max_mag = -1.0_f32;
+    let mut peak_bin = 0;
+    for i in 0..n {
+        let mag = buffer[i].norm_sqr();
+        if mag > max_mag {
+            max_mag = mag;
+            peak_bin = i;
+        }
+    }
+
+    // 3-point interpolation [SPAWC20] eq. 6
+    // k_alpha = 0.5 * (Y[k-1] - Y[k+1]) / (Y[k-1] - 2Y[k] + Y[k+1])
+    let k_minus = (peak_bin + n - 1) % n;
+    let k_plus = (peak_bin + 1) % n;
+
+    let mag_k = buffer[peak_bin].norm();
+    let mag_k_minus = buffer[k_minus].norm();
+    let mag_k_plus = buffer[k_plus].norm();
+
+    let denom = mag_k_minus - 2.0 * mag_k + mag_k_plus;
+    let mut frac_cfo = 0.0_f32;
+    if denom.abs() > 1e-6 {
+        frac_cfo = 0.5 * (mag_k_minus - mag_k_plus) / denom;
+    }
+
+    // Integer offset split requires downchirp correlation which is more complex.
+    // As a best effort fallback, we will assume integer offsets are zero for now
+    // and just return the fractional corrections.
+    //
+    // CFO is mapped to phase correction. STO is mapped to sample shift.
+    // For simplicity we return (frac_cfo, 0.0) as sto involves fractional resampling.
+
+    (frac_cfo, 0.0)
 }
 
 /// Stage 3 — dechirp each symbol: multiply by the conjugate reference
@@ -178,8 +332,63 @@ pub fn estimate_cfo_sto(
 /// the Complex32 type but not a transform). A naive O(N^2) DFT is possible
 /// without a new dependency but would be slow at SF11/SF12 (N=2048/4096)
 /// for anything beyond bench-testing a captured file offline.
-pub fn dechirp_symbols(_iq: &IqBuffer, _cfg: &LoraConfig) -> Vec<u16> {
-    todo!("needs an FFT (add rustfft or similar to Cargo.toml) — reference chirp x0[n] formula is [EPFL-RE] eq. 2.2 with S=0, or equivalently [SPAWC20] eq. 1")
+pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &LoraConfig) -> Vec<u16> {
+    let sf = cfg.spreading_factor;
+    let n = 1_usize << sf;
+
+    // The preamble structure: 8 upchirps + 2 sync words + 2.25 downchirps.
+    // Total preamble length = 12.25 symbols. We'll start extracting symbols
+    // at the 12.25 symbol mark. Since we work with integer indices, we approximate
+    // 12.25 * n.
+    let payload_start_idx = start + (12 * n) + (n / 4);
+
+    let mut symbols = Vec::new();
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(n);
+    let base_downchirp = generate_downchirp(sf);
+
+    let mut window_start = payload_start_idx;
+
+    // Allocate the buffer once outside the loop
+    let mut buffer = vec![Complex32::new(0.0, 0.0); n];
+
+    // We only process full symbols
+    while window_start + n <= iq.samples.len() {
+
+        for i in 0..n {
+            // Apply CFO correction. The phase accumulates over time.
+            let global_idx = window_start + i;
+            // Phase correction = exp(-j * 2 * pi * cfo * global_idx / N)
+            // (Assuming cfo is in bins)
+            let phase_correction = -2.0 * PI * cfo * (global_idx as f32) / (n as f32);
+            let cfo_phasor = Complex32::new(phase_correction.cos(), phase_correction.sin());
+
+            // Dechirp
+            buffer[i] = iq.samples[global_idx] * base_downchirp[i] * cfo_phasor;
+        }
+
+        fft.process(&mut buffer);
+
+        let mut max_mag = -1.0_f32;
+        let mut peak_bin = 0;
+        for i in 0..n {
+            let mag = buffer[i].norm_sqr();
+            if mag > max_mag {
+                max_mag = mag;
+                peak_bin = i;
+            }
+        }
+
+        // Because `start` is the precise sample index of the start of the preamble
+        // (incorporating the integer STO/tau calculation from `detect_preamble`),
+        // our analysis windows are exactly aligned to the symbol boundaries.
+        // Therefore, the raw `peak_bin` directly represents the decoded symbol value
+        // (no need to subtract any reference timing bin offset).
+        symbols.push(peak_bin as u16);
+        window_start += n;
+    }
+
+    symbols
 }
 
 // ============================================================================
@@ -524,8 +733,8 @@ pub fn parse_header_and_check_crc(_bytes: &[u8]) -> Option<Vec<u8>> {
 /// reviewable.
 pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     let start = detect_preamble(iq, cfg)?;
-    let (_cfo, _sto) = estimate_cfo_sto(iq, start, cfg);
-    let raw_symbols = dechirp_symbols(iq, cfg);
+    let (cfo, sto) = estimate_cfo_sto(iq, start, cfg);
+    let raw_symbols = dechirp_symbols(iq, start, cfo, sto, cfg);
     let symbols = gray_demap(&raw_symbols);
     let bits = deinterleave(&symbols, cfg);
     let nibbles = hamming_decode(&bits, cfg.coding_rate);
