@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.andmesh.app.ui.tactical.MeshNode
 import com.andmesh.app.ui.tactical.TacticalMainScreen
 
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val context = LocalContext.current
                     TacticalMainScreen(
                         hackRfLinked = hackRfLinked,
                         frequencyMhz = "869.525",
@@ -53,7 +56,9 @@ class MainActivity : ComponentActivity() {
                         signalDbm = "-95 dBm",
                         spreadingFactor = "SF11",
                         nodes = dummyNodes,
-                        onSendClick = { /* TODO */ }
+                        onSendClick = {
+                            Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
+                        }
                     )
                 }
             }
