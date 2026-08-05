@@ -7,12 +7,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.andmesh.app.ui.tactical.MeshNode
 import com.andmesh.app.ui.tactical.TacticalMainScreen
 
 class MainActivity : ComponentActivity() {
+    private var hackRfRepository: HackRfRepository? = null
+    private var hackRfLinked by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        hackRfRepository = HackRfRepository(
+            context = this,
+            onDeviceReady = {
+                hackRfLinked = true
+                it.startReceiving()
+            },
+            onDeviceError = { error ->
+                hackRfLinked = false
+                // Optional: show error message in UI
+            }
+        )
+
+        hackRfRepository?.initialize()
 
         val dummyNodes = listOf(
             MeshNode("Alpha Base", "0 HOPS"),
@@ -27,8 +47,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     TacticalMainScreen(
-                        hackRfLinked = false,
-                        frequencyMhz = "868.125",
+                        hackRfLinked = hackRfLinked,
+                        frequencyMhz = "869.525",
                         channelName = "LongFast",
                         signalDbm = "-95 dBm",
                         spreadingFactor = "SF11",
@@ -38,5 +58,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        hackRfRepository?.close()
     }
 }
