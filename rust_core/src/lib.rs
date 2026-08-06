@@ -48,9 +48,12 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
 
                 match packet::decode_mesh_packet(&payload, &known_channels) {
                     Ok(mesh_packet) => {
+                        // PLACEHOLDER: println! does not output to Logcat on Android.
+                        // The decoded payload currently is not passed anywhere to the UI.
                         println!("Decoded mesh packet: {:?}", mesh_packet);
                     }
                     Err(e) => {
+                        // PLACEHOLDER: println! does not output to Logcat on Android.
                         println!("Failed to decode mesh packet: {:?}", e);
                     }
                 }
