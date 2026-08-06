@@ -1,94 +1,22 @@
-   Compiling proc-macro2 v1.0.107
-   Compiling quote v1.0.47
-   Compiling unicode-ident v1.0.24
-   Compiling anyhow v1.0.104
-   Compiling either v1.17.0
-   Compiling typenum v1.20.1
-   Compiling itertools v0.14.0
-   Compiling libc v0.2.189
-   Compiling cfg-if v1.0.4
-   Compiling syn v2.0.119
-   Compiling rustix v1.1.4
-   Compiling hybrid-array v0.4.14
-   Compiling getrandom v0.4.3
-   Compiling bitflags v2.13.1
-   Compiling equivalent v1.0.2
-   Compiling prettyplease v0.2.37
-   Compiling linux-raw-sys v0.12.1
-   Compiling bytes v1.12.1
-   Compiling hashbrown v0.17.1
-   Compiling regex-syntax v0.8.11
-   Compiling indexmap v2.14.0
-   Compiling once_cell v1.21.4
-   Compiling fastrand v2.5.0
-   Compiling regex-automata v0.4.16
-   Compiling log v0.4.33
-   Compiling autocfg v1.5.1
-   Compiling fixedbitset v0.5.7
-   Compiling num-traits v0.2.19
-   Compiling petgraph v0.7.1
-   Compiling tempfile v3.27.0
-   Compiling regex v1.13.1
-   Compiling prost-derive v0.13.5
-   Compiling jni-sys-macros v0.4.1
-   Compiling inout v0.2.2
-   Compiling crypto-common v0.2.2
-   Compiling block-buffer v0.12.1
-   Compiling multimap v0.10.1
-   Compiling jni-sys v0.3.1
-   Compiling thiserror v1.0.69
-   Compiling heck v0.5.0
-   Compiling prost v0.13.5
-   Compiling cipher v0.5.2
-   Compiling prost-types v0.13.5
-   Compiling jni-sys v0.4.1
-   Compiling thiserror-impl v1.0.69
-   Compiling memchr v2.8.3
-   Compiling prost-build v0.13.5
-   Compiling combine v4.6.7
-   Compiling cpufeatures v0.3.0
-   Compiling cpubits v0.1.1
-   Compiling cesu8 v1.1.0
-   Compiling aes v0.9.2
-   Compiling num-complex v0.4.6
-   Compiling ctr v0.10.1
-   Compiling rust_core v0.1.0 (/app/rust_core)
-   Compiling jni v0.21.1
-warning: unused import: `jni::sys::jbyteArray`
- --> src/lib.rs:7:5
-  |
-7 | use jni::sys::jbyteArray;
-  |     ^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
-warning: unused variable: `env`
-  --> src/lib.rs:11:5
-   |
-11 |     env: JNIEnv,
-   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
-   |
-   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
 warning: function `gray_demap_matches_lora_sdr_grayToBinary16` should have a snake case name
-   --> src/lora_phy.rs:595:8
+   --> src/lora_phy.rs:821:8
     |
-595 |     fn gray_demap_matches_lora_sdr_grayToBinary16() {
+821 |     fn gray_demap_matches_lora_sdr_grayToBinary16() {
     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `gray_demap_matches_lora_sdr_gray_to_binary16`
     |
     = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
 
-warning: `rust_core` (lib test) generated 3 warnings (run `cargo fix --lib -p rust_core --tests` to apply 2 suggestions)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.50s
-     Running unittests src/lib.rs (rust_core/target/debug/deps/rust_core-257dce3684e7977a)
+warning: `rust_core` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running unittests src/lib.rs (rust_core/target/debug/deps/rust_core-afab5ee3a52d251c)
 
 running 7 tests
-test lora_phy::tests::dewhiten_is_its_own_inverse ... ok
-test lora_phy::tests::deinterleave_round_trips_via_matching_interleaver ... ok
 test lora_phy::tests::gray_demap_matches_lora_sdr_grayToBinary16 ... ok
 test lora_phy::tests::gray_demap_is_a_bijection_over_one_period ... ok
+test lora_phy::tests::deinterleave_round_trips_via_matching_interleaver ... ok
 test lora_phy::tests::hamming_decode_74_lossless_and_corrects_single_bit ... ok
-test lora_phy::tests::pack_nibbles_to_bytes_lsb_nibble_first ... ok
 test lora_phy::tests::hamming_decode_84_lossless_and_corrects_single_bit ... ok
+test lora_phy::tests::pack_nibbles_to_bytes_lsb_nibble_first ... ok
+test lora_phy::tests::dewhiten_is_its_own_inverse ... ok
 
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
