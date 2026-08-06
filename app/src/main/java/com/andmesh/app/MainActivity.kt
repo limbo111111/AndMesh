@@ -1,6 +1,11 @@
 package com.andmesh.app
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,25 +21,42 @@ import com.andmesh.app.ui.tactical.MeshNode
 import com.andmesh.app.ui.tactical.TacticalMainScreen
 
 class MainActivity : ComponentActivity() {
-    private var hackRfRepository: HackRfRepository? = null
+    private var meshSdrService: MeshSdrService? = null
+    private var isBound by mutableStateOf(false)
     private var hackRfLinked by mutableStateOf(false)
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as MeshSdrService.LocalBinder
+            meshSdrService = binder.getService()
+            isBound = true
+
+            // Set the listener to update the UI when the device becomes ready
+            meshSdrService?.onDeviceReadyListener = { isReady ->
+                hackRfLinked = isReady
+            }
+            // Check initial state
+            hackRfLinked = meshSdrService?.isDeviceReady == true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            isBound = false
+            meshSdrService?.onDeviceReadyListener = null
+            meshSdrService = null
+            hackRfLinked = false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        hackRfRepository = HackRfRepository(
-            context = this,
-            onDeviceReady = {
-                hackRfLinked = true
-                it.startReceiving()
-            },
-            onDeviceError = { error ->
-                hackRfLinked = false
-                // Optional: show error message in UI
-            }
-        )
-
-        hackRfRepository?.initialize()
+        val serviceIntent = Intent(this, MeshSdrService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
 
         val dummyNodes = listOf(
             MeshNode("Alpha Base", "0 HOPS"),
@@ -67,6 +89,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        hackRfRepository?.close()
+        if (isBound) {
+            unbindService(serviceConnection)
+            isBound = false
+        }
     }
 }

@@ -38,9 +38,22 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
             };
 
             if let Some(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
-                // Here we would typically forward the payload to packet decode, etc.
-                // packet::decode_mesh_packet(&payload, &known_channels);
-                println!("Decoded payload: {:?}", payload);
+                // Default known channels. Currently supporting standard Meshtastic LongFast.
+                let known_channels = vec![
+                    packet::KnownChannel {
+                        name: "LongFast".to_string(),
+                        key: crypto::resolve_psk(&[1]).unwrap(), // Default PSK [1] expands to AQ==
+                    }
+                ];
+
+                match packet::decode_mesh_packet(&payload, &known_channels) {
+                    Ok(mesh_packet) => {
+                        println!("Decoded mesh packet: {:?}", mesh_packet);
+                    }
+                    Err(e) => {
+                        println!("Failed to decode mesh packet: {:?}", e);
+                    }
+                }
             }
         }
     }));

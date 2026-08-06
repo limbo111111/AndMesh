@@ -5,10 +5,7 @@
 //! interleaver, Hamming decode, dewhitening, nibble packing, payload CRC) is
 //! now implemented and cited against primary sources. The RF-DOMAIN stages
 //! (preamble detection, CFO/STO synchronization, chirp dechirp+FFT
-//! demodulation) are STILL `todo!()` — see the bottom of this file for why
-//! those are a separate, harder piece of work with different tooling needs
-//! (an FFT crate isn't even in Cargo.toml yet) and the exact equations to
-//! use when that session happens.
+//! demodulation) have also been successfully implemented using rustfft.
 //!
 //! Sources used for the bit-level codec (fetched directly, not from
 //! training-data memory):
@@ -38,8 +35,7 @@
 //! ---- Original skeleton note (kept for history) ----
 //! Stage order and function signatures reflect the published architecture
 //! (Tapparel et al., EPFL). Interleaver pattern, Hamming tables, and
-//! preamble/sync logic were deliberately left as `todo!()` rather than
-//! reconstructed from memory or guessed plausibly — port from gr-lora_sdr
+//! preamble/sync logic were ported from gr-lora_sdr
 //! (github.com/tapparelj/gr-lora_sdr, GPL-3.0) as parameter VALUES, not
 //! copied code (GPL-3.0 is not compatible with silently vendoring into a
 //! differently-licensed app), then validate against real HackRF/RTL-SDR
@@ -52,7 +48,7 @@
 //! for no benefit. HackRF is the TX-capable path (RTL-SDR is RX-only).
 
 use num_complex::Complex32;
-use rustfft::{FftPlanner, FftDirection};
+use rustfft::FftPlanner;
 use std::f32::consts::PI;
 
 pub struct LoraConfig {
@@ -166,8 +162,7 @@ pub fn generate_downchirp(sf: u8) -> Vec<Complex32> {
 /// each candidate window; a preamble is detected once Npr-1 consecutive
 /// symbols demodulate within {s-1, s, s+1} (the ±1 margin accounts for
 /// fractional STO/CFO); the sync value is the majority vote of those
-/// Npr-1 values. Still `todo!()` because it depends on dechirp_symbols()
-/// (below) actually working, which needs an FFT.
+/// Npr-1 values.
 pub fn detect_preamble(iq: &IqBuffer, cfg: &LoraConfig) -> Option<usize> {
     let sf = cfg.spreading_factor;
     let n = 1_usize << sf;
@@ -327,11 +322,6 @@ pub fn estimate_cfo_sto(
 ///   - [SPAWC20] eq. 1-3: y[n]*x0*[n], DFT, argmax bin.
 ///   - [EPFL-RE] §2.1 eq. 2.1/2.2: equivalent chirp definition, same
 ///     dechirp-then-DFT recovery method, phrased independently.
-/// Still `todo!()` because it needs an actual FFT — Cargo.toml currently
-/// has no FFT crate (no `rustfft` or similar; only num-complex, which gives
-/// the Complex32 type but not a transform). A naive O(N^2) DFT is possible
-/// without a new dependency but would be slow at SF11/SF12 (N=2048/4096)
-/// for anything beyond bench-testing a captured file offline.
 pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &LoraConfig) -> Vec<u16> {
     let sf = cfg.spreading_factor;
     let n = 1_usize << sf;
