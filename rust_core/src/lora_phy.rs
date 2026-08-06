@@ -447,9 +447,7 @@ pub fn gray_demap(raw_symbols: &[u16]) -> Vec<u16> {
 /// combinations round-trip losslessly. This is now a high-confidence port,
 /// not a flagged guess — though "verified against my own encoder" is not
 /// the same as "verified against real over-the-air Meshtastic traffic".
-pub fn deinterleave(symbols: &[u16], cfg: &LoraConfig) -> Vec<u8> {
-    let sf = cfg.spreading_factor as usize; // PPM in [LORA-SDR]'s naming
-    let n = coding_rate_n(cfg.coding_rate) as usize; // 4+RDD in [LORA-SDR]'s naming
+pub fn deinterleave(symbols: &[u16], sf: usize, n: usize) -> Vec<u8> {
     let mut codewords: Vec<u8> = Vec::new();
 
     for block in symbols.chunks(n) {
@@ -754,11 +752,107 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     let (cfo, sto) = estimate_cfo_sto(iq, start, cfg);
     let raw_symbols = dechirp_symbols(iq, start, cfo, sto, cfg);
     let symbols = gray_demap(&raw_symbols);
-    let bits = deinterleave(&symbols, cfg);
-    let nibbles = hamming_decode(&bits, cfg.coding_rate);
-    let bytes = pack_nibbles_to_bytes(&nibbles);
-    let dewhitened = dewhiten(&bytes);
-    parse_header_and_check_crc(&dewhitened)
+
+    let sf = cfg.spreading_factor as usize;
+    let header_n = 8; // HEADER_RDD = 4, n = 4 + 4 = 8
+    let n_header_symbols = 8;
+
+    if symbols.len() < n_header_symbols {
+        return None;
+    }
+
+    // --- PHASE 1: HEADER DECODE ---
+    let header_symbols = &symbols[..n_header_symbols];
+    let header_codewords = deinterleave(header_symbols, sf, header_n);
+
+    // According to LoRaDecoder.cpp, header length is N_HEADER_CODEWORDS = 5
+    // with N_HEADER_SYMBOLS = 8.
+    // However, deinterleave will give us `sf` codewords. We only need the first 5.
+    if header_codewords.len() < 5 {
+        return None;
+    }
+
+    // decodeHamming84sx returns the decoded nibble
+    // The header is always coded with CR=4/8, so n=8
+    let header_nibbles = hamming_decode(&header_codewords[..5], 8); // 8 is the coding rate n=8
+
+    // Pack into bytes. As per LoRaDecoder.cpp:
+    // bytes[0] = decodeHamming84sx(codewords[1]) | decodeHamming84sx(codewords[0]) << 4
+    // bytes[1] = decodeHamming84sx(codewords[2]) (coding rate and crc enable)
+    // bytes[2] = decodeHamming84sx(codewords[4]) | decodeHamming84sx(codewords[3]) << 4
+    let mut header_bytes = vec![0u8; 3];
+    header_bytes[0] = header_nibbles[1] | (header_nibbles[0] << 4);
+    header_bytes[1] = header_nibbles[2];
+    header_bytes[2] = header_nibbles[4] | (header_nibbles[3] << 4);
+
+    let dewhitened_header = dewhiten(&header_bytes);
+
+    // Verify checksum
+    // header_checksum expects: h0 = bytes[0], h1_low_nibble = bytes[1]
+    let expected_checksum = header_checksum(dewhitened_header[0], dewhitened_header[1] & 0x0f);
+    let actual_checksum = ((dewhitened_header[1] >> 4) & 0x0f) | ((dewhitened_header[2] & 0x01) << 4);
+
+    if actual_checksum != expected_checksum {
+        return None; // Header CRC failed
+    }
+
+    let payload_len = dewhitened_header[0] as usize;
+    let crc_present = (dewhitened_header[1] & 0x01) != 0;
+    let rdd = (dewhitened_header[1] >> 1) & 0x07;
+    let payload_n = (4 + rdd) as usize;
+
+    if rdd > 4 {
+        return None; // invalid coding rate
+    }
+
+    // Compute required number of payload symbols
+    let _num_payload_bytes = payload_len + if crc_present { 2 } else { 0 };
+    // We need num_payload_bytes * 2 nibbles
+    // Each block of `payload_n` symbols gives `sf` codewords (nibbles).
+    // Let's use the standard flow: deinterleave remaining symbols.
+    let payload_symbols = &symbols[n_header_symbols..];
+
+    // Check if we have enough payload symbols.
+    // The C++ code: numCodewords = roundUp(bytes.size() * 2, PPM);
+    // numSymbols = (numCodewords / PPM) * (4 + rdd)
+    // But we just process what we have and let the downstream handle truncation.
+    let payload_codewords = deinterleave(payload_symbols, sf, payload_n);
+
+    // payload coding_rate interpretation in rust: n = 4 + rdd.
+    // For n=8 -> 4/8, n=7 -> 4/7, n=6 -> 4/6, n=5 -> 4/5
+    let payload_nibbles = hamming_decode(&payload_codewords, payload_n as u8);
+    let payload_bytes = pack_nibbles_to_bytes(&payload_nibbles);
+
+    // In the C++ code, if explicit header is used, whitening sequence for payload starts with offset.
+    // Wait, let's look at `dewhiten` function here. The original code dewhitened the WHOLE message
+    // including header, so the sequence naturally progressed.
+    // We can concatenate header and payload bytes, dewhiten them together!
+    let mut all_bytes = Vec::new();
+    all_bytes.extend_from_slice(&header_bytes);
+    all_bytes.extend_from_slice(&payload_bytes);
+    let dewhitened_all = dewhiten(&all_bytes);
+
+    // Extract payload
+    if dewhitened_all.len() < 3 + payload_len {
+        return None;
+    }
+
+    let final_payload = dewhitened_all[3..3+payload_len].to_vec();
+
+    if crc_present {
+        // Extract CRC bytes
+        if dewhitened_all.len() < 3 + payload_len + 2 {
+            return None; // Cannot verify CRC, truncated packet
+        }
+        let data_for_crc = &dewhitened_all[3..3+payload_len+2];
+        if !verify_payload_crc(data_for_crc) {
+            // Return None on payload CRC mismatch? The prompt didn't say, but Meshtastic drops invalid.
+            // Let's return None.
+            return None;
+        }
+    }
+
+    Some(final_payload)
 }
 
 // TX direction mirrors this pipeline in reverse (whiten -> Hamming encode ->
@@ -819,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    fn gray_demap_matches_lora_sdr_grayToBinary16() {
+    fn gray_demap_matches_lora_sdr_gray_to_binary16() {
         // [LORA-SDR]'s grayToBinary16 is an unrolled version of the same
         // algorithm; spot-check a few values against a hand-computed
         // reference (standard Gray decode: b = g; b ^= b>>8; b ^= b>>4;
@@ -916,7 +1010,7 @@ mod tests {
 
         for &sf in &[7usize, 8, 11, 12] {
             for &n in &[5usize, 6, 7, 8] {
-                let cfg = LoraConfig {
+                let _cfg = LoraConfig {
                     spreading_factor: sf as u8,
                     bandwidth_hz: 250_000,
                     coding_rate: n as u8,
@@ -928,7 +1022,7 @@ mod tests {
                     .map(|i| (((i as u64 * 2654435761u64) % (1u64 << n)) as u32) as u8)
                     .collect();
                 let symbols = test_interleave(&codewords, sf, n);
-                let recovered = deinterleave(&symbols, &cfg);
+                let recovered = deinterleave(&symbols, sf, n);
                 assert_eq!(recovered, codewords, "round-trip failed for sf={sf} n={n}");
             }
         }
