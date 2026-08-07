@@ -26,8 +26,8 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 - ✅ Deinterleaver
 - ✅ Hamming-Decode
 - ✅ Dewhitening
-- ⚠️ Header-Parsing + CRC (Parsing existiert, aber CRC ist **absichtlich deaktiviert**, da das Header-Layout noch unbestätigt ist)
-- ⚠️ RX-Architektur: `try_decode_packet` macht bisher nur einen "One-Phase Decode" über den ganzen Buffer. Für LoRa-Pakete mit explizitem Header ist jedoch ein "Two-Phase Decode" erforderlich.
+- ✅ Header-Parsing + CRC (Parsing existiert und CRC-Prüfung in `try_decode_packet` ist aktiv, liefert `None` bei Fehler)
+- ✅ RX-Architektur: `try_decode_packet` implementiert einen "Two-Phase Decode" (zuerst Header mit CR=4/8, dann Payload basierend auf den Header-Parametern).
 - ❌ TX-Pfad (Pipeline umgekehrt) — noch nicht implementiert (im Code explizit weggelassen).
 - Alle Konstanten (Interleaver/Whitening/Hamming) aus gr-lora_sdr portiert.
 - Reihenfolge: RX zuerst gegen echte HackRF-Aufnahmen testen, TX erst danach versuchen.

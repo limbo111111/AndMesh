@@ -3,13 +3,13 @@ pub mod lora_phy;
 pub mod packet;
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JByteArray};
+use jni::objects::{JClass, JByteArray, JValue};
 use std::panic;
 use num_complex::Complex32;
 
 #[no_mangle]
 pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     iq_samples: JByteArray,
 ) {
@@ -46,16 +46,18 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
                     }
                 ];
 
-                match packet::decode_mesh_packet(&payload, &known_channels) {
-                    Ok(mesh_packet) => {
-                        // PLACEHOLDER: println! does not output to Logcat on Android.
-                        // The decoded payload currently is not passed anywhere to the UI.
-                        println!("Decoded mesh packet: {:?}", mesh_packet);
-                    }
-                    Err(e) => {
-                        // PLACEHOLDER: println! does not output to Logcat on Android.
-                        println!("Failed to decode mesh packet: {:?}", e);
-                    }
+                let msg = match packet::decode_mesh_packet(&payload, &known_channels) {
+                    Ok(mesh_packet) => format!("Decoded mesh packet: {:?}", mesh_packet),
+                    Err(e) => format!("Failed to decode mesh packet: {:?}", e),
+                };
+
+                if let Ok(jmsg) = env.new_string(&msg) {
+                    let _ = env.call_static_method(
+                        "com/andmesh/app/RtlSdrNative",
+                        "onPacketDecoded",
+                        "(Ljava/lang/String;)V",
+                        &[JValue::Object(&jmsg.into())],
+                    );
                 }
             }
         }
