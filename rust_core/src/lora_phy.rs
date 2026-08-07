@@ -677,60 +677,6 @@ pub fn header_checksum(h0: u8, h1_low_nibble: u8) -> u8 {
     res
 }
 
-/// Stage 8 — parse the LoRa PHY explicit header and verify its checksum.
-///
-/// PARTIALLY KNOWN, NOT FULLY WIRED UP. What's now available:
-///   - `header_checksum()` above — a verified port, ready to use
-///   - `N_HEADER_CODEWORDS`-equivalent structure from [LORA-SDR]:
-///     `HEADER_RDD=4` (header always CR=4/8, n=8) and
-///     `N_HEADER_CODEWORDS=5` (matches [EPFL-RE]'s "5 codewords long"
-///     finding exactly — two independent sources agree on this number)
-///   - what's NOT pinned down: the exact BIT layout within those 5
-///     codewords' worth of data (which bits are payload-length vs coding-
-///     rate vs crc-present, in what order) — inferred plausibly above but
-///     not confirmed bit-for-bit against either [LORA-SDR]'s actual header-
-///     assembly code (not fetched this session) or a real Meshtastic
-///     capture
-///   - the report's own "implicit header" (4 bytes: To/From/Id/Flags) is
-///     explicitly NOT part of LoRa PHY — it's an artifact of the Arduino
-///     RFM95 library used for [EPFL-RE]'s testing, so it does NOT apply to
-///     Meshtastic, which has its own framing on top of raw LoRa PHY
-///
-/// Still not implemented as a full function: needs the header's exact bit
-/// layout confirmed (either fetch more of [LORA-SDR]'s header-assembly
-/// code, or test against a real captured Meshtastic packet), plus the
-/// two-phase decode restructuring noted on try_decode_packet() below.
-pub fn parse_header_and_check_crc(bytes: &[u8]) -> Option<Vec<u8>> {
-    if bytes.len() < 3 {
-        return None;
-    }
-    // The explicit header is typically 3 bytes long.
-    // bytes[0] is payload length. bytes[1] low nibble is CR & CRC-present flags.
-    let h0 = bytes[0];
-    let h1_low_nibble = bytes[1] & 0x0f;
-
-    let expected_checksum = header_checksum(h0, h1_low_nibble);
-
-    // The actual checksum is encoded in the upper nibble of bytes[1] and lower bit of bytes[2]
-    // based on the 20-bit total size (8 + 4 + 8) and our checksum generating 5 bits.
-    let actual_checksum = ((bytes[1] >> 4) & 0x0f) | ((bytes[2] & 0x01) << 4);
-
-    // In a strict implementation, we would return None on a mismatch.
-    // We'll enforce it here, though the layout may need refinement against real captures.
-    if actual_checksum != expected_checksum {
-        // INTENTIONALLY DISABLED: header layout unconfirmed, see JULES_TASK Runde 4 §2.2
-        // return None;
-    }
-
-    let payload_len = h0 as usize;
-    let payload_start = 3;
-    if bytes.len() < payload_start + payload_len {
-        return None;
-    }
-
-    Some(bytes[payload_start..payload_start+payload_len].to_vec())
-}
-
 /// Top-level RX entry point wiring the stages above in order. Once this
 /// returns Some(bytes), hand them to packet::decode_mesh_packet() and, if
 /// the channel is encrypted, crypto::crypt_payload() (see crypto.rs) to get
