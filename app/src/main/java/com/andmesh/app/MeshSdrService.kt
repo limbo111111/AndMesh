@@ -69,7 +69,14 @@ class MeshSdrService : Service() {
             this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = Notification.Builder(this, CHANNEL_ID)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        val notification = builder
             .setContentTitle("MeshSDR")
             .setContentText("SDR Link Active")
             .setSmallIcon(android.R.drawable.ic_menu_compass) // Placeholder icon
