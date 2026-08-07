@@ -1,10 +1,4 @@
 // TacticalMainScreen.kt — "Aussehen #2 / Tactical-MilSpec" Hauptscreen.
-// Startpunkt/Vorlage für Jules Task 4. Paketname unten an das echte MeshSDR-Projekt
-// anpassen (aktuell Platzhalter, analog RFCuts Struktur).
-//
-// Fonts: als .ttf in res/font/ bundeln (Big Shoulders Stencil, Barlow Condensed —
-// beides freie Google Fonts). Bundled statt Downloadable Fonts gewählt, damit keine
-// Play-Services-Cert-Hashes gepflegt werden müssen.
 
 package com.andmesh.app.ui.tactical
 
@@ -13,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.andmesh.app.R  // für R.font.* — einkommentieren im echten Projekt
+import com.andmesh.app.R
 
 // ---- Design-Tokens: "Aussehen #2 — Tactical/MilSpec" ----
 object TacticalColors {
@@ -50,6 +46,7 @@ fun TacticalMainScreen(
     signalDbm: String,
     spreadingFactor: String,
     nodes: List<MeshNode>,
+    messages: List<MeshMessage>,
     onSendClick: () -> Unit,
 ) {
     Column(
@@ -59,21 +56,42 @@ fun TacticalMainScreen(
     ) {
         StatusHeader(hackRfLinked)
         BriefingBox(frequencyMhz, channelName, signalDbm, spreadingFactor)
-        Text(
-            text = "ROSTER — ${nodes.size} STATIONEN",
-            color = TacticalColors.Tan,
-            fontFamily = CondensedFontFamily,
-            fontSize = 11.sp,
-            letterSpacing = 1.5.sp,
-            modifier = Modifier.padding(start = 14.dp, top = 8.dp)
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 14.dp)
-        ) {
-            nodes.forEach { node -> RosterRow(node) }
+
+        // Split space between nodes and messages
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "ROSTER — ${nodes.size} STATIONEN",
+                color = TacticalColors.Tan,
+                fontFamily = CondensedFontFamily,
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+                modifier = Modifier.padding(start = 14.dp, top = 8.dp)
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .weight(0.4f)
+                    .padding(horizontal = 14.dp)
+            ) {
+                items(nodes) { node -> RosterRow(node) }
+            }
+
+            Text(
+                text = "COMMS LOG",
+                color = TacticalColors.Tan,
+                fontFamily = CondensedFontFamily,
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+                modifier = Modifier.padding(start = 14.dp, top = 16.dp)
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .weight(0.6f)
+                    .padding(horizontal = 14.dp)
+            ) {
+                items(messages) { msg -> MessageRow(msg) }
+            }
         }
+
         SendBar(onClick = onSendClick)
     }
 }
@@ -169,6 +187,31 @@ private fun RosterRow(node: MeshNode) {
                 fontSize = 11.sp
             )
         }
+        HorizontalDivider(color = TacticalColors.Divider)
+    }
+}
+
+@Composable
+private fun MessageRow(msg: MeshMessage) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Text(
+            text = "FROM: ${msg.fromNode.uppercase()}",
+            color = TacticalColors.Amber,
+            fontFamily = CondensedFontFamily,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = msg.text,
+            color = TacticalColors.TextPrimary,
+            fontFamily = CondensedFontFamily,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+        )
         HorizontalDivider(color = TacticalColors.Divider)
     }
 }

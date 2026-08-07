@@ -22,13 +22,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.andmesh.app.data.AppDatabase
-import com.andmesh.app.data.NodeEntity
-import com.andmesh.app.ui.tactical.MeshNode
 import com.andmesh.app.ui.tactical.TacticalMainScreen
-import java.util.UUID
+import com.andmesh.app.ui.tactical.TacticalViewModel
 
 class MainActivity : ComponentActivity() {
     private var meshSdrService: MeshSdrService? = null
@@ -41,11 +39,9 @@ class MainActivity : ComponentActivity() {
             meshSdrService = binder.getService()
             isBound = true
 
-            // Set the listener to update the UI when the device becomes ready
             meshSdrService?.onDeviceReadyListener = { isReady ->
                 hackRfLinked = isReady
             }
-            // Check initial state
             hackRfLinked = meshSdrService?.isDeviceReady == true
         }
 
@@ -88,25 +84,20 @@ class MainActivity : ComponentActivity() {
         }
 
         val database = AppDatabase.getDatabase(this)
-        val nodeDao = database.nodeDao()
+
+        val viewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return TacticalViewModel(database.nodeDao()) as T
+            }
+        }).get(TacticalViewModel::class.java)
 
         RtlSdrNative.packetListener = { packetInfo ->
-            lifecycleScope.launch {
-                val entity = NodeEntity(
-                    id = UUID.randomUUID().toString(),
-                    name = "Node ${System.currentTimeMillis() % 1000}",
-                    hops = 0,
-                    lastHeard = System.currentTimeMillis()
-                )
-                nodeDao.insertNode(entity)
-            }
+            viewModel.onPacketReceived(packetInfo)
         }
 
         setContent {
-            val nodesFlow by nodeDao.getAllNodes().collectAsState(initial = emptyList())
-            val displayNodes = nodesFlow.map { entity ->
-                MeshNode(entity.name, "${entity.hops} HOPS")
-            }
+            val uiState by viewModel.uiState.collectAsState()
 
             MaterialTheme {
                 Surface(
@@ -118,9 +109,10 @@ class MainActivity : ComponentActivity() {
                         hackRfLinked = hackRfLinked,
                         frequencyMhz = "869.525",
                         channelName = "LongFast",
-                        signalDbm = "-95 dBm",
+                        signalDbm = "-95 dBm", // We don't have SNR/RSSI from DSP yet
                         spreadingFactor = "SF11",
-                        nodes = displayNodes,
+                        nodes = uiState.nodes,
+                        messages = uiState.messages,
                         onSendClick = {
                             Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
                         }
