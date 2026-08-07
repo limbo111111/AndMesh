@@ -20,9 +20,15 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import com.andmesh.app.data.AppDatabase
+import com.andmesh.app.data.NodeEntity
 import com.andmesh.app.ui.tactical.MeshNode
 import com.andmesh.app.ui.tactical.TacticalMainScreen
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private var meshSdrService: MeshSdrService? = null
@@ -81,13 +87,27 @@ class MainActivity : ComponentActivity() {
             startMeshSdrService()
         }
 
-        val dummyNodes = listOf(
-            MeshNode("Alpha Base", "0 HOPS"),
-            MeshNode("Bravo Team", "1 HOP"),
-            MeshNode("Charlie Patrol", "2 HOPS")
-        )
+        val database = AppDatabase.getDatabase(this)
+        val nodeDao = database.nodeDao()
+
+        RtlSdrNative.packetListener = { packetInfo ->
+            lifecycleScope.launch {
+                val entity = NodeEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = "Node ${System.currentTimeMillis() % 1000}",
+                    hops = 0,
+                    lastHeard = System.currentTimeMillis()
+                )
+                nodeDao.insertNode(entity)
+            }
+        }
 
         setContent {
+            val nodesFlow by nodeDao.getAllNodes().collectAsState(initial = emptyList())
+            val displayNodes = nodesFlow.map { entity ->
+                MeshNode(entity.name, "${entity.hops} HOPS")
+            }
+
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -100,7 +120,7 @@ class MainActivity : ComponentActivity() {
                         channelName = "LongFast",
                         signalDbm = "-95 dBm",
                         spreadingFactor = "SF11",
-                        nodes = dummyNodes,
+                        nodes = displayNodes,
                         onSendClick = {
                             Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
                         }
