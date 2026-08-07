@@ -37,9 +37,6 @@ object TacticalColors {
     val Divider = Color(0xFF2C2C24)
 }
 
-// val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
-// val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
-// Platzhalter bis res/font/ bestückt ist, damit die Datei für sich betrachtbar bleibt:
 val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
 val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
 
