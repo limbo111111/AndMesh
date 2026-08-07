@@ -13,6 +13,8 @@ num-complex = "0.4"
 aes = "0.9.2"
 ctr = "0.10.1"
 rustfft = "6.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [build-dependencies]
 prost-build = "0.13"

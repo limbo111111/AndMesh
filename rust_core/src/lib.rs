@@ -6,6 +6,18 @@ use jni::JNIEnv;
 use jni::objects::{JClass, JByteArray, JValue};
 use std::panic;
 use num_complex::Complex32;
+use serde::Serialize;
+use packet::proto::mesh_packet::PayloadVariant;
+
+#[derive(Serialize)]
+struct DecodedPacketJson {
+    from: u32,
+    to: u32,
+    id: u32,
+    rx_time: Option<u32>,
+    portnum: u32,
+    payload_text: Option<String>,
+}
 
 #[no_mangle]
 pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
@@ -15,9 +27,6 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
 ) {
     let _ = panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if let Ok(bytes) = env.convert_byte_array(iq_samples) {
-            // Convert byte array to complex IQ samples
-            // We assume interleaved 8-bit or 16-bit IQ, usually 8-bit unsigned for RTL-SDR
-            // or 8-bit signed for HackRF. We'll treat them as 8-bit signed for this implementation.
             let mut complex_samples = Vec::with_capacity(bytes.len() / 2);
             for chunk in bytes.chunks_exact(2) {
                 let i = (chunk[0] as i8) as f32 / 128.0;
@@ -38,17 +47,35 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
             };
 
             if let Some(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
-                // Default known channels. Currently supporting standard Meshtastic LongFast.
                 let known_channels = vec![
                     packet::KnownChannel {
                         name: "LongFast".to_string(),
-                        key: crypto::resolve_psk(&[1]).unwrap(), // Default PSK [1] expands to AQ==
+                        key: crypto::resolve_psk(&[1]).unwrap(),
                     }
                 ];
 
                 let msg = match packet::decode_mesh_packet(&payload, &known_channels) {
-                    Ok(mesh_packet) => format!("Decoded mesh packet: {:?}", mesh_packet),
-                    Err(e) => format!("Failed to decode mesh packet: {:?}", e),
+                    Ok(mesh_packet) => {
+                        let mut parsed = DecodedPacketJson {
+                            from: mesh_packet.from,
+                            to: mesh_packet.to,
+                            id: mesh_packet.id,
+                            rx_time: mesh_packet.rx_time,
+                            portnum: 0,
+                            payload_text: None,
+                        };
+
+                        if let Some(PayloadVariant::Decoded(data)) = &mesh_packet.payload_variant {
+                            parsed.portnum = data.portnum as u32;
+                            // TEXT_MESSAGE_APP is portnum 1
+                            if parsed.portnum == 1 {
+                                parsed.payload_text = String::from_utf8(data.payload.clone()).ok();
+                            }
+                        }
+
+                        serde_json::to_string(&parsed).unwrap_or_else(|_| "{}".to_string())
+                    },
+                    Err(e) => format!("{{\"error\": \"{:?}\"}}", e),
                 };
 
                 if let Ok(jmsg) = env.new_string(&msg) {
