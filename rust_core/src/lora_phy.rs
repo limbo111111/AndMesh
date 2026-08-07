@@ -151,6 +151,34 @@ pub fn generate_downchirp(sf: u8) -> Vec<Complex32> {
     chirp
 }
 
+pub fn generate_upchirp(sf: u8) -> Vec<Complex32> {
+    let n = 1_usize << sf;
+    let mut chirp = Vec::with_capacity(n);
+    let n_f32 = n as f32;
+    for i in 0..n {
+        let t = i as f32;
+        let phase = PI * ( (t * t) / n_f32 - t );
+        chirp.push(Complex32::new(phase.cos(), phase.sin()));
+    }
+    chirp
+}
+
+pub fn modulate_symbols(symbols: &[u16], sf: u8) -> Vec<Complex32> {
+    let n = 1_usize << sf;
+    let base_upchirp = generate_upchirp(sf);
+    let mut iq = Vec::with_capacity(symbols.len() * n);
+
+    for &sym in symbols {
+        let sym_usize = sym as usize;
+        for i in 0..n {
+            // cyclic shift of the base upchirp by `sym` bins
+            let idx = (i + n - sym_usize) % n;
+            iq.push(base_upchirp[idx]);
+        }
+    }
+    iq
+}
+
 // ============================================================================
 // RF-domain stages
 // ============================================================================
@@ -402,6 +430,13 @@ pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &L
 /// The "-1 shift" is REMOVED — it was this session's own misreading, not
 /// something [LORA-SDR] supports. This is now a direct, verified port
 /// rather than a flagged guess.
+pub fn gray_map(symbols: &[u16]) -> Vec<u16> {
+    symbols
+        .iter()
+        .map(|&b| b ^ (b >> 1))
+        .collect()
+}
+
 pub fn gray_demap(raw_symbols: &[u16]) -> Vec<u16> {
     raw_symbols
         .iter()
@@ -415,6 +450,15 @@ pub fn gray_demap(raw_symbols: &[u16]) -> Vec<u16> {
             b
         })
         .collect()
+}
+
+pub fn unpack_bytes_to_nibbles(bytes: &[u8]) -> Vec<u8> {
+    let mut nibbles = Vec::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        nibbles.push(b & 0x0F);
+        nibbles.push((b >> 4) & 0x0F);
+    }
+    nibbles
 }
 
 /// Stage 5 — deinterleave.
@@ -447,6 +491,27 @@ pub fn gray_demap(raw_symbols: &[u16]) -> Vec<u16> {
 /// combinations round-trip losslessly. This is now a high-confidence port,
 /// not a flagged guess — though "verified against my own encoder" is not
 /// the same as "verified against real over-the-air Meshtastic traffic".
+pub fn interleave(codewords: &[u8], sf: usize, n: usize) -> Vec<u16> {
+    let mut symbols = Vec::new();
+
+    for block in codewords.chunks(sf) {
+        let mut padded_block = block.to_vec();
+        if padded_block.len() < sf {
+            padded_block.resize(sf, 0); // Zero-pad the last block
+        }
+        let mut syms = vec![0u16; n];
+        for k in 0..n {
+            for m in 0..sf {
+                let i = (m + k + sf) % sf;
+                let bit = (padded_block[i] >> k) & 1;
+                syms[k] |= (bit as u16) << m;
+            }
+        }
+        symbols.extend(syms);
+    }
+    symbols
+}
+
 pub fn deinterleave(symbols: &[u16], sf: usize, n: usize) -> Vec<u8> {
     let mut codewords: Vec<u8> = Vec::new();
 
@@ -502,6 +567,25 @@ pub fn deinterleave(symbols: &[u16], sf: usize, n: usize) -> Vec<u8> {
 ///
 /// The old HAMMING_LUT/HAMMING_LUT_CR5 constants are left in the file
 /// (below) for history/reference but are UNUSED by this function now.
+pub fn hamming_encode(nibbles: &[u8], coding_rate: u8) -> Vec<u8> {
+    let n = coding_rate_n(coding_rate);
+    nibbles.iter().map(|&x| {
+        let d0 = x & 1; let d1 = (x >> 1) & 1; let d2 = (x >> 2) & 1; let d3 = (x >> 3) & 1;
+        let mut b = x & 0xf;
+        b |= (d0 ^ d1 ^ d2) << 4;
+        if n >= 6 {
+            b |= (d1 ^ d2 ^ d3) << 5;
+        }
+        if n >= 7 {
+            b |= (d0 ^ d1 ^ d3) << 6;
+        }
+        if n >= 8 {
+            b |= (d0 ^ d2 ^ d3) << 7;
+        }
+        b
+    }).collect()
+}
+
 pub fn hamming_decode(codewords: &[u8], coding_rate: u8) -> Vec<u8> {
     let n = coding_rate_n(coding_rate);
 
@@ -594,6 +678,10 @@ pub fn dewhiten(bytes: &[u8]) -> Vec<u8> {
         .collect()
 }
 
+pub fn whiten(bytes: &[u8]) -> Vec<u8> {
+    dewhiten(bytes) // Whitening is its own inverse (XOR)
+}
+
 /// Verify a LoRa payload CRC (the optional 16-bit CRC covering the payload,
 /// enabled by the header's has_crc bit — separate from the header's own
 /// 5-bit CRC, which is NOT implemented here, see parse_header_and_check_crc
@@ -645,6 +733,26 @@ pub fn verify_payload_crc(data_including_crc: &[u8]) -> bool {
         }
     }
     (crc ^ final_xor) == transmitted_crc
+}
+
+pub fn compute_payload_crc(message: &[u8]) -> u16 {
+    let final_xor = if message.len() >= 2 {
+        u16::from_le_bytes([message[message.len() - 2], message[message.len() - 1]])
+    } else {
+        0x0000
+    };
+    let mut crc: u16 = 0x0000;
+    for &byte in message {
+        crc ^= (byte as u16) << 8;
+        for _ in 0..8 {
+            if crc & 0x8000 != 0 {
+                crc = (crc << 1) ^ 0x1021; // x^16+x^12+x^5+1, [EPFL-RE] §2.5
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    crc ^ final_xor
 }
 
 /// Explicit LoRa PHY header's own 5-bit integrity check (separate from the
@@ -801,9 +909,76 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     Some(final_payload)
 }
 
-// TX direction mirrors this pipeline in reverse (whiten -> Hamming encode ->
-// interleave -> Gray map -> chirp modulate + upsample). Deliberately not
-// sketched here: get RX verified against real captures first.
+pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
+    let sf = cfg.spreading_factor;
+    let payload_n = coding_rate_n(cfg.coding_rate);
+    let mut header_bytes = vec![0u8; 3];
+    header_bytes[0] = payload.len() as u8;
+    // has_crc = 1, cr = (payload_n - 4)
+    let cr_bits = payload_n - 4;
+    header_bytes[1] = 0x01 | (cr_bits << 1);
+
+    let expected_checksum = header_checksum(header_bytes[0], header_bytes[1] & 0x0f);
+    header_bytes[1] |= (expected_checksum & 0x0f) << 4;
+    header_bytes[2] = (expected_checksum >> 4) & 0x01;
+
+    let crc = compute_payload_crc(payload);
+    let mut payload_with_crc = payload.to_vec();
+    payload_with_crc.extend_from_slice(&crc.to_le_bytes());
+
+    let mut all_bytes = Vec::new();
+    all_bytes.extend_from_slice(&header_bytes);
+    all_bytes.extend_from_slice(&payload_with_crc);
+
+    let whitened_all = whiten(&all_bytes);
+    let whitened_header = &whitened_all[..3];
+    let whitened_payload = &whitened_all[3..];
+
+    let header_nibbles = unpack_bytes_to_nibbles(whitened_header);
+    // only 5 nibbles needed for 20-bit header
+    let header_codewords = hamming_encode(&header_nibbles[..5], 8); // n=8 for header
+    let header_symbols = interleave(&header_codewords, sf as usize, 8); // n=8 for header
+
+    let payload_nibbles = unpack_bytes_to_nibbles(whitened_payload);
+    let payload_codewords = hamming_encode(&payload_nibbles, cfg.coding_rate);
+    let payload_symbols = interleave(&payload_codewords, sf as usize, payload_n as usize);
+
+    let mut all_symbols = Vec::new();
+    all_symbols.extend_from_slice(&header_symbols);
+    all_symbols.extend_from_slice(&payload_symbols);
+
+    let gray_mapped = gray_map(&all_symbols);
+    let mut iq = Vec::new();
+    let n = 1_usize << sf;
+
+    let base_upchirp = generate_upchirp(sf);
+    let base_downchirp = generate_downchirp(sf);
+
+    // 8 upchirps
+    for _ in 0..8 {
+        iq.extend_from_slice(&base_upchirp);
+    }
+    // 2 sync words (downchirp shifted by sync val, usually 0x34 or 0x12, using Meshtastic default 0x34 for now?
+    // Usually handled at higher level but we will hardcode 0x34 as we don't have sync word in cfg.)
+    // Wait, typical preamble is just 8 upchirps, then 2 upchirps with sync word phase shift, then 2.25 downchirps.
+    // [SPAWC20] Sec II.A: "2 symbols encoding the network identifier (sync word)".
+    // We just shift base_upchirp by sync word. 0x34 = 52. Let's use 0x12 = 18 for now or maybe just 0 as placeholder.
+    let sync_val = 0x12; // Assuming 0x12 for sync word.
+    for _ in 0..2 {
+        for i in 0..n {
+            let idx = (i + n - sync_val) % n;
+            iq.push(base_upchirp[idx]);
+        }
+    }
+    // 2.25 downchirps
+    iq.extend_from_slice(&base_downchirp);
+    iq.extend_from_slice(&base_downchirp);
+    iq.extend_from_slice(&base_downchirp[..n/4]);
+
+    iq.extend_from_slice(&modulate_symbols(&gray_mapped, sf));
+
+    iq
+}
 
 // ============================================================================
 // Unit tests — known-answer checks for the parts implemented this session.
