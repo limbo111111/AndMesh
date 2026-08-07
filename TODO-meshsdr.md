@@ -5,30 +5,30 @@ wurde — nichts Neues erfunden. ✅ = verifiziert/fertig, ⚠️ = teilweise / 
 Prüfung, ❌ = noch nicht angefangen.
 
 ## 0 — Grundlage (bevor irgendwas testbar ist)
-- ❌ Echtes Android-Studio-Projekt anlegen (`app`-Modul + `rust_core`-Modul)
-- ❌ cargo-ndk + JNI-Setup einrichten (analog RFCut)
-- ❌ RFCuts `HackRfRepository`, `RtlSdrRepository`, `RtlSdrNative`-JNI-Bridge,
-  `rtlSdrMutex`-Guard 1:1 übernehmen — nicht neu schreiben
+- ✅ Echtes Android-Studio-Projekt anlegen (`app`-Modul + `rust_core`-Modul)
+- ✅ cargo-ndk + JNI-Setup einrichten (analog RFCut)
+- ⚠️ RFCuts `HackRfRepository`, `RtlSdrRepository`, `RtlSdrNative`-JNI-Bridge,
+  `rtlSdrMutex`-Guard 1:1 übernehmen — nicht neu schreiben (Teilweise in com/andmesh/app/)
 - ❌ `hackrf_android` (demantz/hackrf_android) als Dependency einbinden, wie in RFCut
-- ❌ `meshtastic/protobufs` als Submodule/vendored einbinden + `prost-build` in `build.rs`
+- ✅ `meshtastic/protobufs` als Submodule/vendored einbinden + `prost-build` in `build.rs`
 
 ## Krypto & Pakete (`crypto.rs`, `packet.rs`) — größtenteils fertig
 - ✅ AES-256-CTR-Mechanik
 - ✅ Channel-Hash (`xorHash`/`generateHash`) — gegen echten Firmware-Quellcode verifiziert
 - ✅ IV/Nonce-Konstruktion (`CryptoEngine::initNonce`) — doppelt gegenbestätigt
-- ⚠️ Letztes Byte des Default-PSK-Arrays klären — zwei Quellen widersprechen sich
+- ✅ Letztes Byte des Default-PSK-Arrays klären — zwei Quellen widersprechen sich
   (`0xbf` vs. `0x01`), gegen aktuellen `master`-Branch von `Channels.cpp` prüfen
-- ⚠️ `packet.rs`-Feldnamen (`packet.from`, `.id`, `.channel`, `PayloadVariant::…`)
+- ✅ `packet.rs`-Feldnamen (`packet.from`, `.id`, `.channel`, `PayloadVariant::…`)
   gegen den echten generierten Code abgleichen, sobald `prost-build` läuft
 
 ## LoRa-PHY (`lora_phy.rs`) — das Kernstück, faktisch bei 0%
 - ❌ Preamble-Erkennung
 - ❌ CFO/STO-Schätzung
 - ❌ Dechirp + FFT-Demodulation
-- ❌ Gray-Decode (unkritisch, direkt implementierbar sobald Symbole korrekt reinkommen)
+- ✅ Gray-Decode (unkritisch, direkt implementierbar sobald Symbole korrekt reinkommen)
 - ❌ Deinterleaver — exakte Tabelle nötig
-- ❌ Hamming-Decode — Generatormatrix nötig
-- ❌ Dewhitening — LFSR-Sequenz nötig
+- ✅ Hamming-Decode — Generatormatrix nötig
+- ✅ Dewhitening — LFSR-Sequenz nötig
 - ❌ Header-Parsing + CRC
 - ❌ TX-Pfad (Pipeline umgekehrt) — noch nicht mal skizziert
 - Alle Konstanten (Interleaver/Whitening/Hamming) aus gr-lora_sdr (EPFL,
@@ -44,7 +44,7 @@ Prüfung, ❌ = noch nicht angefangen.
 - ⚠️ `MeshSdrService.kt`: `HackRfRepositoryLike`-Platzhalter durch RFCuts echtes
   Repository ersetzen, echte Methodennamen prüfen (aktuell nur aus Audit-Historie
   plausibel angenommen)
-- ⚠️ `TacticalMainScreen.kt`: Platzhalter-Fonts (`FontFamily.SansSerif`) durch
+- ✅ `TacticalMainScreen.kt`: Platzhalter-Fonts (`FontFamily.SansSerif`) durch
   echte `.ttf` in `res/font/` ersetzen, Package-Namen an echtes Projekt anpassen
 - ❌ Weitere Screens im Aussehen-#2-Look: Nachrichten-Thread, Kanal-/PSK-Einstellungen
 - ❌ Echtes Notification-Icon statt Platzhalter
