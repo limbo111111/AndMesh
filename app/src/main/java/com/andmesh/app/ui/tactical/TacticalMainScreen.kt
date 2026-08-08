@@ -2,6 +2,12 @@
 
 package com.andmesh.app.ui.tactical
 
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,7 +53,7 @@ fun TacticalMainScreen(
     spreadingFactor: String,
     nodes: List<MeshNode>,
     messages: List<MeshMessage>,
-    onSendClick: () -> Unit,
+    onSendClick: (String) -> Unit,
     onSettingsClick: () -> Unit = {}
 ) {
     Column(
@@ -242,23 +248,61 @@ private fun HorizontalDivider(color: Color) {
 }
 
 @Composable
-private fun SendBar(onClick: () -> Unit) {
-    Box(
+private fun SendBar(onClick: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(14.dp)
-            .background(TacticalColors.OliveDrab)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
+            .background(TacticalColors.Panel)
+            .border(1.dp, TacticalColors.OliveDrab),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            "NACHRICHT SENDEN",
-            color = TacticalColors.TextPrimary,
-            fontFamily = StencilFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            letterSpacing = 1.sp
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            textStyle = TextStyle(
+                color = TacticalColors.TextPrimary,
+                fontFamily = CondensedFontFamily,
+                fontSize = 15.sp
+            ),
+            decorationBox = { innerTextField ->
+                if (text.isEmpty()) {
+                    Text(
+                        text = "ENTER MESSAGE...",
+                        color = TacticalColors.Amber,
+                        fontFamily = CondensedFontFamily,
+                        fontSize = 15.sp
+                    )
+                }
+                innerTextField()
+            }
         )
+
+        Box(
+            modifier = Modifier
+                .background(TacticalColors.OliveDrab)
+                .clickable {
+                    if (text.isNotBlank()) {
+                        onClick(text)
+                        text = ""
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "SENDEN",
+                color = TacticalColors.TextPrimary,
+                fontFamily = StencilFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                letterSpacing = 1.sp
+            )
+        }
     }
 }
