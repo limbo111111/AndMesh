@@ -19,8 +19,20 @@ class HackRfRepository(
     private var rxThread: Thread? = null
     private var isReceiving = false
 
-    // Default configuration for Meshtastic (EU_868)
-    private val FREQUENCY_HZ = 869525000L
+    // Configuration
+    var frequencyHz = 869525000L
+        set(value) {
+            field = value
+            if (isReceiving) {
+                try {
+                    hackrf?.setFrequency(value)
+                    RtlSdrNative.setFrequencyHz(value)
+                } catch (e: Exception) {
+                    Log.e("HackRfRepository", "Failed to set frequency: ${e.message}")
+                }
+            }
+        }
+
     private val SAMPLE_RATE = 2000000 // 2 Msps
 
     fun initialize() {
@@ -37,7 +49,8 @@ class HackRfRepository(
             // Configure HackRF
             hackrf?.apply {
                 Log.d("HackRfRepository", "Configuring HackRF...")
-                setFrequency(FREQUENCY_HZ)
+                setFrequency(frequencyHz)
+                RtlSdrNative.setFrequencyHz(frequencyHz)
                 setSampleRate(SAMPLE_RATE, 1) // Sample rate, divider=1
                 setBasebandFilterBandwidth(1750000) // approx for 2 Msps
                 setRxVGAGain(32) // reasonable defaults
