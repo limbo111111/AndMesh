@@ -48,13 +48,14 @@ fun TacticalMainScreen(
     nodes: List<MeshNode>,
     messages: List<MeshMessage>,
     onSendClick: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(TacticalColors.Background)
     ) {
-        StatusHeader(hackRfLinked)
+        StatusHeader(hackRfLinked, onSettingsClick)
         BriefingBox(frequencyMhz, channelName, signalDbm, spreadingFactor)
 
         // Split space between nodes and messages
@@ -97,23 +98,37 @@ fun TacticalMainScreen(
 }
 
 @Composable
-private fun StatusHeader(hackRfLinked: Boolean) {
+private fun StatusHeader(hackRfLinked: Boolean, onSettingsClick: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "MESHCOMM",
+                    color = TacticalColors.Amber,
+                    fontFamily = StencilFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    if (hackRfLinked) "SITREP · HACKRF LINK AKTIV" else "SITREP · KEIN LINK",
+                    color = TacticalColors.Tan,
+                    fontFamily = CondensedFontFamily,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.sp
+                )
+            }
             Text(
-                "MESHCOMM",
+                "EINSTELLUNGEN",
                 color = TacticalColors.Amber,
-                fontFamily = StencilFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                if (hackRfLinked) "SITREP · HACKRF LINK AKTIV" else "SITREP · KEIN LINK",
-                color = TacticalColors.Tan,
                 fontFamily = CondensedFontFamily,
-                fontSize = 12.sp,
-                letterSpacing = 1.sp
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                modifier = Modifier.clickable(onClick = onSettingsClick)
             )
         }
         CornerBrackets(modifier = Modifier.matchParentSize())

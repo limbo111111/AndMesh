@@ -5,9 +5,21 @@ pub mod packet;
 use jni::JNIEnv;
 use jni::objects::{JClass, JByteArray, JValue};
 use std::panic;
+use std::sync::atomic::{AtomicU64, Ordering};
 use num_complex::Complex32;
 use serde::Serialize;
 use packet::proto::mesh_packet::PayloadVariant;
+
+static CURRENT_FREQ_HZ: AtomicU64 = AtomicU64::new(869_525_000);
+
+#[no_mangle]
+pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_setFrequencyHz(
+    _env: JNIEnv,
+    _class: JClass,
+    freq_hz: jni::sys::jlong,
+) {
+    CURRENT_FREQ_HZ.store(freq_hz as u64, Ordering::Relaxed);
+}
 
 #[derive(Serialize)]
 struct DecodedPacketJson {
@@ -43,7 +55,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
                 spreading_factor: 11,
                 bandwidth_hz: 250_000,
                 coding_rate: 5,
-                freq_hz: 869_525_000,
+                freq_hz: CURRENT_FREQ_HZ.load(Ordering::Relaxed),
             };
 
             if let Some(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {

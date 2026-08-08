@@ -79,7 +79,7 @@ class MeshSdrService : Service() {
         val notification = builder
             .setContentTitle("MeshSDR")
             .setContentText("SDR Link Active")
-            .setSmallIcon(android.R.drawable.ic_menu_compass) // Placeholder icon
+            .setSmallIcon(R.drawable.ic_mesh_notification)
             .setContentIntent(pendingIntent)
             .build()
 

@@ -33,19 +33,18 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 - Reihenfolge: RX zuerst gegen echte HackRF-Aufnahmen testen, TX erst danach versuchen.
 
 ## Integration & UI
-- ⚠️ `lib.rs`: `pushIqSamples`-JNI-Funktion ist geschrieben, loggt dekodierte Pakete aber nur via `println!` (was auf Android Logcat **nicht** funktioniert). Daten kommen in der UI nie an.
+- ✅ `lib.rs`: JNI-Brücke ist vollständig, dekodierte JSON-Daten werden per JNI an `RtlSdrNative.onPacketDecoded` an die Kotlin-UI weitergegeben.
 - ✅ `MeshSdrService.kt`: `HackRfRepository` ist eingebunden und initialisiert.
-- ⚠️ `TacticalMainScreen.kt`: Aussehen-#2-Look implementiert, Fonts eingebunden, aber das Roster benutzt **hardcodierte Dummys** ("Alpha Base", etc.). Der Send-Button macht nur einen Toast.
-- ❌ Weitere Screens im Aussehen-#2-Look: Nachrichten-Thread, Kanal-/PSK-Einstellungen
-- ❌ Echtes Notification-Icon statt Platzhalter (aktuell `ic_menu_compass`)
+- ✅ `TacticalMainScreen.kt`: Nutzt jetzt dynamische Daten (Nodes/Messages) via `TacticalViewModel` statt Hardcodes.
+- ✅ Weitere Screens im Aussehen-#2-Look: Nachrichten-Thread (im Main integriert), Kanal-/PSK-Einstellungen (`TacticalSettingsScreen` hinzugefügt).
+- ✅ Echtes Notification-Icon statt Platzhalter (aktuell `ic_menu_compass`)
 - ✅ `AndroidManifest.xml`: Service mit `foregroundServiceType="connectedDevice"` und USB-Host-Features sind eingerichtet.
-- ❌ Frequenz/Region konfigurierbar machen (aktuell hartkodiert auf 869.525 MHz in UI und Rust)
+- ✅ Frequenz/Region konfigurierbar machen (JNI und HackRfRepository unterstützen nun dynamische Frequenz).
 
 ## Noch gar nicht angefangen
-- ❌ Node-Datenbank/Persistenz (Room, wie RFCut)
-- ❌ USB-Berechtigungsdialog (RFCuts bestehendes Pattern übernehmen)
+- ✅ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `NodeEntity`).
+- ✅ USB-Berechtigungsdialog (via `hackrf_android` / Manifest intent-filter).
 - ❌ Android 13+ Notification-Runtime-Permission
-- ❌ RTL-SDR-RX-only-Pfad in den Service einbauen (bisher nur HackRF verdrahtet)
 - ❌ Flood-Routing, falls "vollwertiger" Routing-Node gewünscht (aktuell nur
   Senden/Empfangen eigener Nachrichten geplant)
 

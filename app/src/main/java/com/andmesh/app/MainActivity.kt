@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
+            var showSettings by mutableStateOf(false)
 
             MaterialTheme {
                 Surface(
@@ -105,18 +106,34 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val context = LocalContext.current
-                    TacticalMainScreen(
-                        hackRfLinked = hackRfLinked,
-                        frequencyMhz = "869.525",
-                        channelName = "LongFast",
-                        signalDbm = "-95 dBm", // We don't have SNR/RSSI from DSP yet
-                        spreadingFactor = "SF11",
-                        nodes = uiState.nodes,
-                        messages = uiState.messages,
-                        onSendClick = {
-                            Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                    val currentFreq = meshSdrService?.hackRfRepository?.frequencyHz ?: 869525000L
+                    val currentFreqMhz = currentFreq / 1_000_000.0
+
+                    if (showSettings) {
+                        com.andmesh.app.ui.tactical.TacticalSettingsScreen(
+                            currentFreqHz = currentFreq,
+                            onFrequencySelected = { freq ->
+                                meshSdrService?.hackRfRepository?.frequencyHz = freq
+                            },
+                            onBackClick = { showSettings = false }
+                        )
+                    } else {
+                        TacticalMainScreen(
+                            hackRfLinked = hackRfLinked,
+                            frequencyMhz = String.format("%.3f", currentFreqMhz),
+                            channelName = "LongFast",
+                            signalDbm = "-95 dBm",
+                            spreadingFactor = "SF11",
+                            nodes = uiState.nodes,
+                            messages = uiState.messages,
+                            onSendClick = {
+                                Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
+                            },
+                            onSettingsClick = {
+                                showSettings = true
+                            }
+                        )
+                    }
                 }
             }
         }
