@@ -56,6 +56,9 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
+        if (!isGranted) {
+            Toast.makeText(this, "Benachrichtigungen deaktiviert. Service läuft im Hintergrund.", Toast.LENGTH_SHORT).show()
+        }
         startMeshSdrService()
     }
 
