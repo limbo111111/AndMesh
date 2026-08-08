@@ -129,8 +129,9 @@ class MainActivity : ComponentActivity() {
                             spreadingFactor = "SF11",
                             nodes = uiState.nodes,
                             messages = uiState.messages,
-                            onSendClick = {
-                                Toast.makeText(context, "Send clicked! TX path not yet implemented.", Toast.LENGTH_SHORT).show()
+                            onSendClick = { text ->
+                                val nodeId = meshSdrService?.hackRfRepository?.nodeId ?: 0
+                                meshSdrService?.hackRfRepository?.sendTextMessage(text, nodeId)
                             },
                             onSettingsClick = {
                                 showSettings = true

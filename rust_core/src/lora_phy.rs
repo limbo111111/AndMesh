@@ -790,17 +790,11 @@ pub fn header_checksum(h0: u8, h1_low_nibble: u8) -> u8 {
 /// the channel is encrypted, crypto::crypt_payload() (see crypto.rs) to get
 /// a readable Meshtastic message.
 ///
-/// ARCHITECTURE NOTE this session found and did NOT fix: this function
-/// still runs every stage ONCE over the whole buffer, but a real explicit-
-/// header LoRa packet needs a TWO-PHASE decode — the header uses a fixed
-/// CR=4/8 and a reduced SF-2 interleaving width (see
-/// parse_header_and_check_crc's doc-comment), while the payload that
-/// follows uses whatever coding_rate the header itself specifies. A correct
-/// implementation decodes the first 8 symbols with fixed parameters to
-/// learn the real coding_rate/payload_length, THEN decodes the rest with
-/// those. Restructuring this function into that two-phase shape is a
-/// concrete next step, not done here to keep this session's change
-/// reviewable.
+/// ARCHITECTURE NOTE: This function implements a TWO-PHASE decode.
+/// It first decodes the explicit header (the first 8 symbols) using fixed
+/// parameters (CR=4/8, n=8) to learn the actual payload length and coding_rate,
+/// and THEN decodes the remaining symbols (the payload) with those
+/// dynamically recovered parameters.
 pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     let start = detect_preamble(iq, cfg)?;
     let (cfo, sto) = estimate_cfo_sto(iq, start, cfg);
@@ -857,6 +851,10 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
 
     if rdd > 4 {
         return None; // invalid coding rate
+    }
+
+    if rdd == 0 {
+        return None; // invalid coding rate n=4, decoding expects n in 5..=8
     }
 
     // Compute required number of payload symbols

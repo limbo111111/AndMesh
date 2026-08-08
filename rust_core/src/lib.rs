@@ -3,7 +3,7 @@ pub mod lora_phy;
 pub mod packet;
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JByteArray, JValue};
+use jni::objects::{JClass, JByteArray, JValue, JString};
 use std::panic;
 use std::sync::atomic::{AtomicU64, Ordering};
 use num_complex::Complex32;
@@ -29,6 +29,59 @@ struct DecodedPacketJson {
     rx_time: Option<u32>,
     portnum: u32,
     payload_text: Option<String>,
+}
+
+use std::sync::atomic::AtomicU32;
+static NEXT_PACKET_ID: AtomicU32 = AtomicU32::new(1);
+
+#[no_mangle]
+pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
+    mut env: JNIEnv,
+    _class: JClass,
+    text: JString,
+    from_node_id: jni::sys::jint,
+) -> jni::sys::jbyteArray {
+    let result = panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let text_str: String = env.get_string(&text).expect("Couldn't get java string").into();
+
+        let mut data = packet::proto::Data::default();
+        data.portnum = 1; // TEXT_MESSAGE_APP
+        data.payload = text_str.into_bytes();
+
+        let mut mesh_packet = packet::proto::MeshPacket::default();
+        mesh_packet.from = from_node_id as u32;
+        mesh_packet.to = 0xFFFFFFFF; // broadcast by default for mesh
+        mesh_packet.id = NEXT_PACKET_ID.fetch_add(1, Ordering::Relaxed);
+        mesh_packet.payload_variant = Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
+
+        let key = crypto::resolve_psk(&[1]).unwrap();
+        let encoded_bytes = packet::encode_mesh_packet(mesh_packet, "LongFast", &key);
+
+        let cfg = lora_phy::LoraConfig {
+            spreading_factor: 11,
+            bandwidth_hz: 250_000,
+            coding_rate: 5,
+            freq_hz: CURRENT_FREQ_HZ.load(Ordering::Relaxed),
+        };
+
+        let complex_samples = lora_phy::encode_packet(&encoded_bytes, &cfg);
+
+        let mut out_bytes = Vec::with_capacity(complex_samples.len() * 2);
+        for sample in complex_samples {
+            let re_clamped = (sample.re * 128.0).clamp(-128.0, 127.0) as i8;
+            let im_clamped = (sample.im * 128.0).clamp(-128.0, 127.0) as i8;
+            out_bytes.push(re_clamped as u8);
+            out_bytes.push(im_clamped as u8);
+        }
+
+        let jbyte_array = env.byte_array_from_slice(&out_bytes).expect("Failed to create byte array");
+        jbyte_array
+    }));
+
+    match result {
+        Ok(jbyte_array) => jbyte_array.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 #[no_mangle]

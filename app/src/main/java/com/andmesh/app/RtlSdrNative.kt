@@ -9,6 +9,7 @@ object RtlSdrNative {
 
     external fun pushIqSamples(iqSamples: ByteArray)
     external fun setFrequencyHz(freqHz: Long)
+    external fun encodeTextMessage(text: String, fromNodeId: Int): ByteArray
 
     var packetListener: ((String) -> Unit)? = null
 
