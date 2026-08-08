@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.andmesh.app"
     compileSdk = 34
+    ndkVersion = "25.1.8937393"
 
     defaultConfig {
         applicationId = "com.andmesh.app"
