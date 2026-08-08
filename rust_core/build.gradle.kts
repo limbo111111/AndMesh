@@ -5,6 +5,7 @@ plugins {
 android {
     namespace = "com.andmesh.rust_core"
     compileSdk = 34
+    ndkVersion = "25.1.8937393"
 
     defaultConfig {
         minSdk = 24
