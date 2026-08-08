@@ -44,7 +44,7 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 ## Noch gar nicht angefangen
 - ✅ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `NodeEntity`).
 - ✅ USB-Berechtigungsdialog (via `hackrf_android` / Manifest intent-filter).
-- ❌ Android 13+ Notification-Runtime-Permission
+- ✅ Android 13+ Notification-Runtime-Permission
 - ❌ Flood-Routing, falls "vollwertiger" Routing-Node gewünscht (aktuell nur
   Senden/Empfangen eigener Nachrichten geplant)
 
