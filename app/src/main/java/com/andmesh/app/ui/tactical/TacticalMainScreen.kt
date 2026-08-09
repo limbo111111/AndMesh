@@ -42,7 +42,7 @@ object TacticalColors {
 val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
 val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
 
-data class MeshNode(val name: String, val hopsLabel: String)
+data class MeshNode(val name: String, val hopsLabel: String, val statusLabel: String = "")
 
 @Composable
 fun TacticalMainScreen(
@@ -192,15 +192,26 @@ private fun RosterRow(node: MeshNode) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                node.name.uppercase(),
-                color = TacticalColors.TextPrimary,
-                fontFamily = CondensedFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp
-            )
+            Column {
+                Text(
+                    node.name.uppercase(),
+                    color = TacticalColors.TextPrimary,
+                    fontFamily = CondensedFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+                if (node.statusLabel.isNotEmpty()) {
+                    Text(
+                        node.statusLabel.uppercase(),
+                        color = TacticalColors.Tan,
+                        fontFamily = CondensedFontFamily,
+                        fontSize = 11.sp
+                    )
+                }
+            }
             Text(
                 node.hopsLabel.uppercase(),
                 color = TacticalColors.Amber,
