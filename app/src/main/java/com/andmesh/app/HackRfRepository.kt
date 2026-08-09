@@ -33,9 +33,10 @@ class HackRfRepository(
     private var txQueue: ArrayBlockingQueue<ByteArray>? = null
 
     // Configuration
-    var frequencyHz = 869525000L
+    var frequencyHz = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getLong("frequency_hz", 869525000L)
         set(value) {
             field = value
+            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putLong("frequency_hz", value).apply()
             if (isReceiving) {
                 try {
                     hackrf?.setFrequency(value)

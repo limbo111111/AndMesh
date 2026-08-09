@@ -27,8 +27,15 @@ class TacticalViewModel(private val nodeDao: NodeDao) : ViewModel() {
     init {
         viewModelScope.launch {
             nodeDao.getAllNodes().collect { entities ->
+                val now = System.currentTimeMillis()
                 val displayNodes = entities.map { entity ->
-                    MeshNode(entity.name, "${entity.hops} HOPS")
+                    val elapsedMs = now - entity.lastHeard
+                    val statusLabel = when {
+                        elapsedMs < 60_000 -> "ONLINE"
+                        elapsedMs < 3600_000 -> "SEEN ${elapsedMs / 60_000} MIN AGO"
+                        else -> "SEEN ${elapsedMs / 3600_000} HR AGO"
+                    }
+                    MeshNode(entity.name, "${entity.hops} HOPS", statusLabel)
                 }
                 _uiState.update { it.copy(nodes = displayNodes) }
             }
@@ -69,6 +76,14 @@ class TacticalViewModel(private val nodeDao: NodeDao) : ViewModel() {
 
         } catch (e: Exception) {
             Log.e("TacticalViewModel", "Failed to parse JSON packet", e)
+        }
+    }
+
+    fun sendLocalMessage(text: String, nodeId: Int) {
+        val fromName = "Node ${nodeId.toString(16).uppercase()}"
+        _uiState.update { state ->
+            val newMessages = listOf(MeshMessage(fromName, text)) + state.messages
+            state.copy(messages = newMessages.take(50)) // Keep last 50 messages
         }
     }
 }

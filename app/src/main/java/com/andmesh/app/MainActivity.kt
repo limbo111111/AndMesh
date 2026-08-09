@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
@@ -101,14 +102,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            var showSettings by mutableStateOf(false)
+            var showSettings by remember { mutableStateOf(false) }
 
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val context = LocalContext.current
                     val currentFreq = meshSdrService?.hackRfRepository?.frequencyHz ?: 869525000L
                     val currentFreqMhz = currentFreq / 1_000_000.0
 
@@ -125,12 +125,13 @@ class MainActivity : ComponentActivity() {
                             hackRfLinked = hackRfLinked,
                             frequencyMhz = String.format("%.3f", currentFreqMhz),
                             channelName = "LongFast",
-                            signalDbm = "-95 dBm",
+                            signalDbm = "N/A",
                             spreadingFactor = "SF11",
                             nodes = uiState.nodes,
                             messages = uiState.messages,
                             onSendClick = { text ->
                                 val nodeId = meshSdrService?.hackRfRepository?.nodeId ?: 0
+                                viewModel.sendLocalMessage(text, nodeId)
                                 meshSdrService?.hackRfRepository?.sendTextMessage(text, nodeId)
                             },
                             onSettingsClick = {
