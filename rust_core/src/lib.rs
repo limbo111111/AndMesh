@@ -31,8 +31,7 @@ struct DecodedPacketJson {
     payload_text: Option<String>,
 }
 
-use std::sync::atomic::AtomicU32;
-static NEXT_PACKET_ID: AtomicU32 = AtomicU32::new(1);
+use rand::RngExt;
 
 #[no_mangle]
 pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
@@ -51,7 +50,8 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
         let mut mesh_packet = packet::proto::MeshPacket::default();
         mesh_packet.from = from_node_id as u32;
         mesh_packet.to = 0xFFFFFFFF; // broadcast by default for mesh
-        mesh_packet.id = NEXT_PACKET_ID.fetch_add(1, Ordering::Relaxed);
+        mesh_packet.id = rand::rng().random::<u32>();
+        mesh_packet.hop_limit = 3;
         mesh_packet.payload_variant = Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
         let key = crypto::resolve_psk(&[1]).unwrap();

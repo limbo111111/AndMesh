@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.util.UUID
 
 data class MeshMessage(val fromNode: String, val text: String)
 

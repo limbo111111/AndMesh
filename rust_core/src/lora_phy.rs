@@ -172,7 +172,7 @@ pub fn modulate_symbols(symbols: &[u16], sf: u8) -> Vec<Complex32> {
         let sym_usize = sym as usize;
         for i in 0..n {
             // cyclic shift of the base upchirp by `sym` bins
-            let idx = (i + n - sym_usize) % n;
+            let idx = (i + sym_usize) % n;
             iq.push(base_upchirp[idx]);
         }
     }
@@ -251,7 +251,7 @@ pub fn detect_preamble(iq: &IqBuffer, cfg: &LoraConfig) -> Option<usize> {
                     // align precisely to the start of the upchirp symbol boundary.
                     // A non-zero peak_bin for an upchirp shifted in time corresponds to a time
                     // delay of `tau = (n - peak_bin) % n` samples.
-                    let block_start = window.saturating_sub(npr_minus_1) * n;
+                    let block_start = (window + 1).saturating_sub(npr_minus_1) * n;
                     let tau = (n - peak_bin) % n;
                     return Some(block_start + tau);
                 }
@@ -824,14 +824,12 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     // The header is always coded with CR=4/8, so n=8
     let header_nibbles = hamming_decode(&header_codewords[..5], 8); // 8 is the coding rate n=8
 
-    // Pack into bytes. As per LoRaDecoder.cpp:
-    // bytes[0] = decodeHamming84sx(codewords[1]) | decodeHamming84sx(codewords[0]) << 4
-    // bytes[1] = decodeHamming84sx(codewords[2]) (coding rate and crc enable)
-    // bytes[2] = decodeHamming84sx(codewords[4]) | decodeHamming84sx(codewords[3]) << 4
-    let mut header_bytes = vec![0u8; 3];
-    header_bytes[0] = header_nibbles[1] | (header_nibbles[0] << 4);
-    header_bytes[1] = header_nibbles[2];
-    header_bytes[2] = header_nibbles[4] | (header_nibbles[3] << 4);
+    // The encoder pads to 6 nibbles when unpacking 3 bytes. We only took the first 5 codewords/nibbles.
+    // pack_nibbles_to_bytes will zero-pad the last nibble.
+    let mut padded_header_nibbles = header_nibbles[..5].to_vec();
+    padded_header_nibbles.push(0);
+
+    let header_bytes = pack_nibbles_to_bytes(&padded_header_nibbles);
 
     let dewhitened_header = dewhiten(&header_bytes);
 
@@ -964,7 +962,7 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     let sync_val = 0x12; // Assuming 0x12 for sync word.
     for _ in 0..2 {
         for i in 0..n {
-            let idx = (i + n - sync_val) % n;
+            let idx = (i + sync_val) % n;
             iq.push(base_upchirp[idx]);
         }
     }
@@ -1108,25 +1106,6 @@ mod tests {
 
     #[test]
     fn deinterleave_round_trips_via_matching_interleaver() {
-        // Direct port of [LORA-SDR]'s diagonalInterleaveSx, LOCAL TO THIS
-        // TEST ONLY (production code has no need for a TX-side interleaver
-        // yet — this exists purely to verify deinterleave() round-trips,
-        // the same property already checked in Python across SF x n
-        // combinations before this was ported, see doc-comment above).
-        fn test_interleave(codewords: &[u8], sf: usize, n: usize) -> Vec<u16> {
-            let mut symbols = vec![0u16; n]; // n symbols per block, NOT sf — caught by
-                                              // manual review (would have panicked for
-                                              // sf=7,n=8: out-of-bounds write at k=7)
-            for k in 0..n {
-                for m in 0..sf {
-                    let i = (m + k + sf) % sf;
-                    let bit = (codewords[i] >> k) & 1;
-                    symbols[k] |= (bit as u16) << m;
-                }
-            }
-            symbols
-        }
-
         for &sf in &[7usize, 8, 11, 12] {
             for &n in &[5usize, 6, 7, 8] {
                 let _cfg = LoraConfig {
@@ -1140,10 +1119,26 @@ mod tests {
                 let codewords: Vec<u8> = (0..sf)
                     .map(|i| (((i as u64 * 2654435761u64) % (1u64 << n)) as u32) as u8)
                     .collect();
-                let symbols = test_interleave(&codewords, sf, n);
+                let symbols = super::interleave(&codewords, sf, n);
                 let recovered = deinterleave(&symbols, sf, n);
                 assert_eq!(recovered, codewords, "round-trip failed for sf={sf} n={n}");
             }
         }
+    }
+
+    #[test]
+    fn encode_then_decode_round_trips() {
+        let cfg = LoraConfig { spreading_factor: 11, bandwidth_hz: 250_000, coding_rate: 5, freq_hz: 869_525_000 };
+        let payload = b"hello mesh";
+        let iq_samples = super::encode_packet(payload, &cfg);
+        let iq = super::IqBuffer { samples: &iq_samples, sample_rate_hz: 250_000 };
+        let decoded_opt = super::try_decode_packet(&iq, &cfg);
+
+        if decoded_opt.is_none() {
+            println!("Decode returned None!");
+        }
+
+        let decoded = decoded_opt.expect("decode failed");
+        assert_eq!(decoded, payload);
     }
 }
