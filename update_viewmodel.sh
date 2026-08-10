@@ -1,1 +1,0 @@
-sed -i 's/val newMessages = listOf(MeshMessage(fromName, text)) + state.messages/val newMessages = listOf(MeshMessage(fromName, text)) + state.messages/g' app/src/main/java/com/andmesh/app/ui/tactical/TacticalViewModel.kt
