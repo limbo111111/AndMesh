@@ -6,11 +6,16 @@ use jni::JNIEnv;
 use jni::objects::{JClass, JByteArray, JValue, JString};
 use std::panic;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use num_complex::Complex32;
 use serde::Serialize;
 use packet::proto::mesh_packet::PayloadVariant;
 
 static CURRENT_FREQ_HZ: AtomicU64 = AtomicU64::new(869_525_000);
+
+lazy_static::lazy_static! {
+    static ref CURRENT_CHANNEL: Mutex<(String, Vec<u8>)> = Mutex::new(("LongFast".to_string(), vec![1]));
+}
 
 #[no_mangle]
 pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_setFrequencyHz(
@@ -19,6 +24,27 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_setFrequencyHz(
     freq_hz: jni::sys::jlong,
 ) {
     CURRENT_FREQ_HZ.store(freq_hz as u64, Ordering::Relaxed);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_setChannel(
+    mut env: JNIEnv,
+    _class: JClass,
+    channel_name: JString,
+    psk: JByteArray,
+) {
+    let _ = panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let ch_name_str: String = match env.get_string(&channel_name) {
+            Ok(s) => s.into(),
+            Err(_) => "LongFast".to_string(),
+        };
+        let psk_bytes = env.convert_byte_array(psk).unwrap_or_else(|_| vec![1]);
+
+        if let Ok(mut channel) = CURRENT_CHANNEL.lock() {
+            channel.0 = ch_name_str;
+            channel.1 = psk_bytes;
+        }
+    }));
 }
 
 #[derive(Serialize)]
@@ -54,8 +80,16 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
         mesh_packet.hop_limit = 3;
         mesh_packet.payload_variant = Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
-        let key = crypto::resolve_psk(&[1]).unwrap();
-        let encoded_bytes = packet::encode_mesh_packet(mesh_packet, "LongFast", &key);
+        let (ch_name, ch_psk) = {
+            if let Ok(channel) = CURRENT_CHANNEL.lock() {
+                (channel.0.clone(), channel.1.clone())
+            } else {
+                ("LongFast".to_string(), vec![1])
+            }
+        };
+
+        let key = crypto::resolve_psk(&ch_psk).unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap());
+        let encoded_bytes = packet::encode_mesh_packet(mesh_packet, &ch_name, &key);
 
         let cfg = lora_phy::LoraConfig {
             spreading_factor: 11,
@@ -112,7 +146,20 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
             };
 
             if let Some(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
+                let (ch_name, ch_psk) = {
+                    if let Ok(channel) = CURRENT_CHANNEL.lock() {
+                        (channel.0.clone(), channel.1.clone())
+                    } else {
+                        ("LongFast".to_string(), vec![1])
+                    }
+                };
+
                 let known_channels = vec![
+                    packet::KnownChannel {
+                        name: ch_name,
+                        key: crypto::resolve_psk(&ch_psk).unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap()),
+                    },
+                    // Fallback to LongFast always if custom fails
                     packet::KnownChannel {
                         name: "LongFast".to_string(),
                         key: crypto::resolve_psk(&[1]).unwrap(),
