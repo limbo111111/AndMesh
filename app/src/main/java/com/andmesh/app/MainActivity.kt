@@ -25,7 +25,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.andmesh.app.data.AppDatabase
 import com.andmesh.app.ui.tactical.TacticalMainScreen
 import com.andmesh.app.ui.tactical.TacticalViewModel
 
@@ -87,12 +86,10 @@ class MainActivity : ComponentActivity() {
             startMeshSdrService()
         }
 
-        val database = AppDatabase.getDatabase(this)
-
         val viewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return TacticalViewModel(database.nodeDao()) as T
+                return TacticalViewModel() as T
             }
         }).get(TacticalViewModel::class.java)
 
@@ -111,6 +108,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val currentFreq = meshSdrService?.hackRfRepository?.frequencyHz ?: 869525000L
                     val currentFreqMhz = currentFreq / 1_000_000.0
+                    val currentChannel = meshSdrService?.hackRfRepository?.channelName ?: "LongFast"
+                    val currentPsk = meshSdrService?.hackRfRepository?.pskBase64 ?: ""
 
                     if (showSettings) {
                         com.andmesh.app.ui.tactical.TacticalSettingsScreen(
@@ -118,13 +117,21 @@ class MainActivity : ComponentActivity() {
                             onFrequencySelected = { freq ->
                                 meshSdrService?.hackRfRepository?.frequencyHz = freq
                             },
+                            currentChannelName = currentChannel,
+                            onChannelNameChanged = { ch ->
+                                meshSdrService?.hackRfRepository?.channelName = ch
+                            },
+                            currentPsk = currentPsk,
+                            onPskChanged = { psk ->
+                                meshSdrService?.hackRfRepository?.pskBase64 = psk
+                            },
                             onBackClick = { showSettings = false }
                         )
                     } else {
                         TacticalMainScreen(
                             hackRfLinked = hackRfLinked,
                             frequencyMhz = String.format("%.3f", currentFreqMhz),
-                            channelName = "LongFast",
+                            channelName = currentChannel,
                             signalDbm = "N/A",
                             spreadingFactor = "SF11",
                             nodes = uiState.nodes,

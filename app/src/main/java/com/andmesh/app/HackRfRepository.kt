@@ -50,6 +50,34 @@ class HackRfRepository(
             }
         }
 
+    var channelName = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getString("channel_name", "LongFast") ?: "LongFast"
+        set(value) {
+            field = value
+            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putString("channel_name", value).apply()
+            updateNativeChannel()
+        }
+
+    var pskBase64 = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getString("psk_base64", "") ?: ""
+        set(value) {
+            field = value
+            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putString("psk_base64", value).apply()
+            updateNativeChannel()
+        }
+
+    private fun updateNativeChannel() {
+        val pskBytes = if (pskBase64.isBlank()) {
+            byteArrayOf(1) // Default to AQ== / short PSK
+        } else {
+            try {
+                android.util.Base64.decode(pskBase64, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                Log.e("HackRfRepository", "Invalid Base64 PSK, falling back to default", e)
+                byteArrayOf(1)
+            }
+        }
+        RtlSdrNative.setChannel(channelName, pskBytes)
+    }
+
     private val SAMPLE_RATE = 2000000 // 2 Msps
 
     fun initialize() {
@@ -68,6 +96,7 @@ class HackRfRepository(
                 Log.d("HackRfRepository", "Configuring HackRF...")
                 setFrequency(frequencyHz)
                 RtlSdrNative.setFrequencyHz(frequencyHz)
+                updateNativeChannel()
                 setSampleRate(SAMPLE_RATE, 1) // Sample rate, divider=1
                 setBasebandFilterBandwidth(1750000) // approx for 2 Msps
                 setRxVGAGain(32) // reasonable defaults

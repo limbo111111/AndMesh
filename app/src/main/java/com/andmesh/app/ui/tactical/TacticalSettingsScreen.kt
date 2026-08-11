@@ -1,12 +1,16 @@
 package com.andmesh.app.ui.tactical
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -15,6 +19,10 @@ import androidx.compose.ui.unit.sp
 fun TacticalSettingsScreen(
     currentFreqHz: Long,
     onFrequencySelected: (Long) -> Unit,
+    currentChannelName: String,
+    onChannelNameChanged: (String) -> Unit,
+    currentPsk: String,
+    onPskChanged: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
     Column(
@@ -72,6 +80,60 @@ fun TacticalSettingsScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "KANALNAME",
+            color = TacticalColors.Tan,
+            fontFamily = CondensedFontFamily,
+            fontSize = 14.sp,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        BasicTextField(
+            value = currentChannelName,
+            onValueChange = onChannelNameChanged,
+            textStyle = TextStyle(
+                color = TacticalColors.TextPrimary,
+                fontFamily = CondensedFontFamily,
+                fontSize = 16.sp
+            ),
+            cursorBrush = SolidColor(TacticalColors.Amber),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TacticalColors.Panel)
+                .border(1.dp, TacticalColors.OliveDrab)
+                .padding(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "PSK (BASE64)",
+            color = TacticalColors.Tan,
+            fontFamily = CondensedFontFamily,
+            fontSize = 14.sp,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        BasicTextField(
+            value = currentPsk,
+            onValueChange = onPskChanged,
+            textStyle = TextStyle(
+                color = TacticalColors.TextPrimary,
+                fontFamily = CondensedFontFamily,
+                fontSize = 16.sp
+            ),
+            cursorBrush = SolidColor(TacticalColors.Amber),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TacticalColors.Panel)
+                .border(1.dp, TacticalColors.OliveDrab)
+                .padding(12.dp)
+        )
 
         Spacer(modifier = Modifier.weight(1f))
 
