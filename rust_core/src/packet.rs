@@ -32,8 +32,8 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/meshtastic.rs"));
 }
 
-use proto::{mesh_packet::PayloadVariant, Data, MeshPacket};
 use prost::Message;
+use proto::{mesh_packet::PayloadVariant, Data, MeshPacket};
 
 #[derive(Debug)]
 pub enum PacketError {
@@ -91,7 +91,8 @@ pub fn decode_mesh_packet(
 pub fn encode_mesh_packet(mut packet: MeshPacket, channel_name: &str, key: &ChannelKey) -> Vec<u8> {
     if let Some(PayloadVariant::Decoded(data)) = &packet.payload_variant {
         let mut plaintext = Vec::new();
-        data.encode(&mut plaintext).expect("Data encode should not fail");
+        data.encode(&mut plaintext)
+            .expect("Data encode should not fail");
         crypto::crypt_payload(key, packet.from, packet.id, &mut plaintext);
 
         let psk_bytes: &[u8] = match key {
@@ -102,6 +103,8 @@ pub fn encode_mesh_packet(mut packet: MeshPacket, channel_name: &str, key: &Chan
         packet.payload_variant = Some(PayloadVariant::Encrypted(plaintext));
     }
     let mut out = Vec::new();
-    packet.encode(&mut out).expect("MeshPacket encode should not fail");
+    packet
+        .encode(&mut out)
+        .expect("MeshPacket encode should not fail");
     out
 }

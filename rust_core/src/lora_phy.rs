@@ -55,11 +55,11 @@ pub struct LoraConfig {
     pub spreading_factor: u8, // SF7..SF12; Meshtastic "LongFast" preset = SF11
     pub bandwidth_hz: u32,    // e.g. 250_000
     pub coding_rate: u8,      // interpreted here as n = 4/CR directly, i.e. 5..=8
-                              // (CR=4/5 -> 5, CR=4/6 -> 6, CR=4/7 -> 7, CR=4/8 -> 8).
-                              // This interpretation of the original skeleton's
-                              // undocumented field is this session's choice — flagged
-                              // since the field had no fixed meaning before now.
-    pub freq_hz: u64,         // e.g. 868_125_000 for EU868 LongFast
+    // (CR=4/5 -> 5, CR=4/6 -> 6, CR=4/7 -> 7, CR=4/8 -> 8).
+    // This interpretation of the original skeleton's
+    // undocumented field is this session's choice — flagged
+    // since the field had no fixed meaning before now.
+    pub freq_hz: u64, // e.g. 868_125_000 for EU868 LongFast
 }
 
 /// n = 4/coding_rate (codeword length in bits) for the four LoRa ECC rates.
@@ -110,7 +110,7 @@ pub const WHITENING_SEQ: [u8; 255] = [
     0x7B, 0xF7, 0xEF, 0xDF, 0xBF, 0x7E, 0xFD, 0xFA, 0xF4, 0xE9, 0xD3, 0xA6, 0x4C, 0x99, 0x33, 0x66,
     0xCD, 0x9A, 0x35, 0x6A, 0xD4, 0xA8, 0x51, 0xA3, 0x46, 0x8C, 0x18, 0x30, 0x60, 0xC1, 0x83, 0x07,
     0x0E, 0x1D, 0x3A, 0x75, 0xEA, 0xD5, 0xAA, 0x55, 0xAB, 0x57, 0xAF, 0x5F, 0xBE, 0x7C, 0xF9, 0xF2,
-    0xE5, 0xCA, 0x94, 0x28, 0x50, 0xA1, 0x42, 0x84, 0x09, 0x13, 0x27, 0x4F, 0x9F, 0x3F, 0x7F
+    0xE5, 0xCA, 0x94, 0x28, 0x50, 0xA1, 0x42, 0x84, 0x09, 0x13, 0x27, 0x4F, 0x9F, 0x3F, 0x7F,
 ];
 
 // Ported from gr-lora_sdr (EPFL, GPL-3.0) hamming_dec_impl.cc: cw_LUT and cw_LUT_cr5
@@ -120,8 +120,12 @@ pub const WHITENING_SEQ: [u8; 255] = [
 // ([LORA-SDR]'s decodeHamming84sx). Kept here for history/reference only —
 // do not delete without checking whether anything else still depends on it
 // (nothing in this file does, as of this rewrite).
-pub const HAMMING_LUT: [u8; 16] = [0, 23, 45, 58, 78, 89, 99, 116, 139, 156, 166, 177, 197, 210, 232, 255];
-pub const HAMMING_LUT_CR5: [u8; 16] = [0, 24, 40, 48, 72, 80, 96, 120, 136, 144, 160, 184, 192, 216, 232, 240];
+pub const HAMMING_LUT: [u8; 16] = [
+    0, 23, 45, 58, 78, 89, 99, 116, 139, 156, 166, 177, 197, 210, 232, 255,
+];
+pub const HAMMING_LUT_CR5: [u8; 16] = [
+    0, 24, 40, 48, 72, 80, 96, 120, 136, 144, 160, 184, 192, 216, 232, 240,
+];
 
 pub struct IqBuffer<'a> {
     pub samples: &'a [Complex32],
@@ -145,7 +149,7 @@ pub fn generate_downchirp(sf: u8) -> Vec<Complex32> {
         // Using -j for the downchirp (conjugate of upchirp):
         // Upchirp phase: 2 * pi * ( (t^2)/(2*N) - t/2 ) = pi * (t^2 / N - t)
         // So downchirp (conjugate): phase = -pi * (t^2 / N - t)
-        let phase = -PI * ( (t * t) / n_f32 - t );
+        let phase = -PI * ((t * t) / n_f32 - t);
         chirp.push(Complex32::new(phase.cos(), phase.sin()));
     }
     chirp
@@ -157,7 +161,7 @@ pub fn generate_upchirp(sf: u8) -> Vec<Complex32> {
     let n_f32 = n as f32;
     for i in 0..n {
         let t = i as f32;
-        let phase = PI * ( (t * t) / n_f32 - t );
+        let phase = PI * ((t * t) / n_f32 - t);
         chirp.push(Complex32::new(phase.cos(), phase.sin()));
     }
     chirp
@@ -291,11 +295,7 @@ fn rctsl_kalpha(spectrum: &[Complex32], kmax: usize, n_eff: f32) -> f32 {
     (n_eff / std::f32::consts::PI) * (a - b) / (u * (a - b) + v * c)
 }
 
-pub fn estimate_cfo_sto(
-    iq: &IqBuffer,
-    preamble_start: usize,
-    cfg: &LoraConfig,
-) -> (f32, f32) {
+pub fn estimate_cfo_sto(iq: &IqBuffer, preamble_start: usize, cfg: &LoraConfig) -> (f32, f32) {
     // Fractional CFO/STO estimation via 3-point parabolic interpolation
     // from [SPAWC20] eq. 6-9.
     // For a robust implementation we need to FFT at least one preamble upchirp
@@ -351,7 +351,13 @@ pub fn estimate_cfo_sto(
 ///   - [SPAWC20] eq. 1-3: y[n]*x0*[n], DFT, argmax bin.
 ///   - [EPFL-RE] §2.1 eq. 2.1/2.2: equivalent chirp definition, same
 ///     dechirp-then-DFT recovery method, phrased independently.
-pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &LoraConfig) -> Vec<u16> {
+pub fn dechirp_symbols(
+    iq: &IqBuffer,
+    start: usize,
+    cfo: f32,
+    _sto: f32,
+    cfg: &LoraConfig,
+) -> Vec<u16> {
     let sf = cfg.spreading_factor;
     let n = 1_usize << sf;
 
@@ -373,7 +379,6 @@ pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &L
 
     // We only process full symbols
     while window_start + n <= iq.samples.len() {
-
         for i in 0..n {
             // Apply CFO correction. The phase accumulates over time.
             let global_idx = window_start + i;
@@ -431,10 +436,7 @@ pub fn dechirp_symbols(iq: &IqBuffer, start: usize, cfo: f32, _sto: f32, cfg: &L
 /// something [LORA-SDR] supports. This is now a direct, verified port
 /// rather than a flagged guess.
 pub fn gray_map(symbols: &[u16]) -> Vec<u16> {
-    symbols
-        .iter()
-        .map(|&b| b ^ (b >> 1))
-        .collect()
+    symbols.iter().map(|&b| b ^ (b >> 1)).collect()
 }
 
 pub fn gray_demap(raw_symbols: &[u16]) -> Vec<u16> {
@@ -569,29 +571,41 @@ pub fn deinterleave(symbols: &[u16], sf: usize, n: usize) -> Vec<u8> {
 /// (below) for history/reference but are UNUSED by this function now.
 pub fn hamming_encode(nibbles: &[u8], coding_rate: u8) -> Vec<u8> {
     let n = coding_rate_n(coding_rate);
-    nibbles.iter().map(|&x| {
-        let d0 = x & 1; let d1 = (x >> 1) & 1; let d2 = (x >> 2) & 1; let d3 = (x >> 3) & 1;
-        let mut b = x & 0xf;
-        b |= (d0 ^ d1 ^ d2) << 4;
-        if n >= 6 {
-            b |= (d1 ^ d2 ^ d3) << 5;
-        }
-        if n >= 7 {
-            b |= (d0 ^ d1 ^ d3) << 6;
-        }
-        if n >= 8 {
-            b |= (d0 ^ d2 ^ d3) << 7;
-        }
-        b
-    }).collect()
+    nibbles
+        .iter()
+        .map(|&x| {
+            let d0 = x & 1;
+            let d1 = (x >> 1) & 1;
+            let d2 = (x >> 2) & 1;
+            let d3 = (x >> 3) & 1;
+            let mut b = x & 0xf;
+            b |= (d0 ^ d1 ^ d2) << 4;
+            if n >= 6 {
+                b |= (d1 ^ d2 ^ d3) << 5;
+            }
+            if n >= 7 {
+                b |= (d0 ^ d1 ^ d3) << 6;
+            }
+            if n >= 8 {
+                b |= (d0 ^ d2 ^ d3) << 7;
+            }
+            b
+        })
+        .collect()
 }
 
 pub fn hamming_decode(codewords: &[u8], coding_rate: u8) -> Vec<u8> {
     let n = coding_rate_n(coding_rate);
 
     fn decode_hamming_84(b: u8) -> (u8, bool) {
-        let b0 = b & 1; let b1 = (b >> 1) & 1; let b2 = (b >> 2) & 1; let b3 = (b >> 3) & 1;
-        let b4 = (b >> 4) & 1; let b5 = (b >> 5) & 1; let b6 = (b >> 6) & 1; let b7 = (b >> 7) & 1;
+        let b0 = b & 1;
+        let b1 = (b >> 1) & 1;
+        let b2 = (b >> 2) & 1;
+        let b3 = (b >> 3) & 1;
+        let b4 = (b >> 4) & 1;
+        let b5 = (b >> 5) & 1;
+        let b6 = (b >> 6) & 1;
+        let b7 = (b >> 7) & 1;
         let p0 = b0 ^ b1 ^ b2 ^ b4;
         let p1 = b1 ^ b2 ^ b3 ^ b5;
         let p2 = b0 ^ b1 ^ b3 ^ b6;
@@ -608,8 +622,13 @@ pub fn hamming_decode(codewords: &[u8], coding_rate: u8) -> Vec<u8> {
     }
 
     fn decode_hamming_74(b: u8) -> u8 {
-        let b0 = b & 1; let b1 = (b >> 1) & 1; let b2 = (b >> 2) & 1; let b3 = (b >> 3) & 1;
-        let b4 = (b >> 4) & 1; let b5 = (b >> 5) & 1; let b6 = (b >> 6) & 1;
+        let b0 = b & 1;
+        let b1 = (b >> 1) & 1;
+        let b2 = (b >> 2) & 1;
+        let b3 = (b >> 3) & 1;
+        let b4 = (b >> 4) & 1;
+        let b5 = (b >> 5) & 1;
+        let b6 = (b >> 6) & 1;
         let p0 = b0 ^ b1 ^ b2 ^ b4;
         let p1 = b1 ^ b2 ^ b3 ^ b5;
         let p2 = b0 ^ b1 ^ b3 ^ b6;
@@ -635,7 +654,10 @@ pub fn hamming_decode(codewords: &[u8], coding_rate: u8) -> Vec<u8> {
     }
 
     match n {
-        8 => codewords.iter().map(|&cw| decode_hamming_84(cw).0).collect(),
+        8 => codewords
+            .iter()
+            .map(|&cw| decode_hamming_84(cw).0)
+            .collect(),
         7 => codewords.iter().map(|&cw| decode_hamming_74(cw)).collect(),
         6 => codewords.iter().map(|&cw| decode_parity_64(cw)).collect(),
         5 => codewords.iter().map(|&cw| decode_parity_54(cw)).collect(),
@@ -772,10 +794,18 @@ pub fn compute_payload_crc(message: &[u8]) -> u16 {
 /// from the bit COUNT matching, not something confirmed bit-for-bit in
 /// either source — flagged accordingly.
 pub fn header_checksum(h0: u8, h1_low_nibble: u8) -> u8 {
-    let a0 = (h0 >> 4) & 1; let a1 = (h0 >> 5) & 1; let a2 = (h0 >> 6) & 1; let a3 = (h0 >> 7) & 1;
-    let b0 = h0 & 1; let b1 = (h0 >> 1) & 1; let b2 = (h0 >> 2) & 1; let b3 = (h0 >> 3) & 1;
-    let c0 = h1_low_nibble & 1; let c1 = (h1_low_nibble >> 1) & 1;
-    let c2 = (h1_low_nibble >> 2) & 1; let c3 = (h1_low_nibble >> 3) & 1;
+    let a0 = (h0 >> 4) & 1;
+    let a1 = (h0 >> 5) & 1;
+    let a2 = (h0 >> 6) & 1;
+    let a3 = (h0 >> 7) & 1;
+    let b0 = h0 & 1;
+    let b1 = (h0 >> 1) & 1;
+    let b2 = (h0 >> 2) & 1;
+    let b3 = (h0 >> 3) & 1;
+    let c0 = h1_low_nibble & 1;
+    let c1 = (h1_low_nibble >> 1) & 1;
+    let c2 = (h1_low_nibble >> 2) & 1;
+    let c3 = (h1_low_nibble >> 3) & 1;
 
     let mut res = (a0 ^ a1 ^ a2 ^ a3) << 4;
     res |= (a3 ^ b1 ^ b2 ^ b3 ^ c0) << 3;
@@ -836,7 +866,8 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     // Verify checksum
     // header_checksum expects: h0 = bytes[0], h1_low_nibble = bytes[1]
     let expected_checksum = header_checksum(dewhitened_header[0], dewhitened_header[1] & 0x0f);
-    let actual_checksum = ((dewhitened_header[1] >> 4) & 0x0f) | ((dewhitened_header[2] & 0x01) << 4);
+    let actual_checksum =
+        ((dewhitened_header[1] >> 4) & 0x0f) | ((dewhitened_header[2] & 0x01) << 4);
 
     if actual_checksum != expected_checksum {
         return None; // Header CRC failed
@@ -887,14 +918,14 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
         return None;
     }
 
-    let final_payload = dewhitened_all[3..3+payload_len].to_vec();
+    let final_payload = dewhitened_all[3..3 + payload_len].to_vec();
 
     if crc_present {
         // Extract CRC bytes
         if dewhitened_all.len() < 3 + payload_len + 2 {
             return None; // Cannot verify CRC, truncated packet
         }
-        let data_for_crc = &dewhitened_all[3..3+payload_len+2];
+        let data_for_crc = &dewhitened_all[3..3 + payload_len + 2];
         if !verify_payload_crc(data_for_crc) {
             // Return None on payload CRC mismatch? The prompt didn't say, but Meshtastic drops invalid.
             // Let's return None.
@@ -969,7 +1000,7 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     // 2.25 downchirps
     iq.extend_from_slice(&base_downchirp);
     iq.extend_from_slice(&base_downchirp);
-    iq.extend_from_slice(&base_downchirp[..n/4]);
+    iq.extend_from_slice(&base_downchirp[..n / 4]);
 
     iq.extend_from_slice(&modulate_symbols(&gray_mapped, sf));
 
@@ -995,7 +1026,10 @@ mod tests {
     // history on the RFCut side — better to compute it the same way both
     // times).
     fn test_encode_hamming_84(x: u8) -> u8 {
-        let d0 = x & 1; let d1 = (x >> 1) & 1; let d2 = (x >> 2) & 1; let d3 = (x >> 3) & 1;
+        let d0 = x & 1;
+        let d1 = (x >> 1) & 1;
+        let d2 = (x >> 2) & 1;
+        let d3 = (x >> 3) & 1;
         let mut b = x & 0xf;
         b |= (d0 ^ d1 ^ d2) << 4;
         b |= (d1 ^ d2 ^ d3) << 5;
@@ -1005,7 +1039,10 @@ mod tests {
     }
 
     fn test_encode_hamming_74(x: u8) -> u8 {
-        let d0 = x & 1; let d1 = (x >> 1) & 1; let d2 = (x >> 2) & 1; let d3 = (x >> 3) & 1;
+        let d0 = x & 1;
+        let d1 = (x >> 1) & 1;
+        let d2 = (x >> 2) & 1;
+        let d3 = (x >> 3) & 1;
         let mut b = x & 0xf;
         b |= (d0 ^ d1 ^ d2) << 4;
         b |= (d1 ^ d2 ^ d3) << 5;
@@ -1024,7 +1061,10 @@ mod tests {
         let decoded = gray_demap(&raw);
         let mut seen = vec![false; n];
         for &v in &decoded {
-            assert!(!seen[v as usize], "gray_demap produced a duplicate — not a bijection");
+            assert!(
+                !seen[v as usize],
+                "gray_demap produced a duplicate — not a bijection"
+            );
             seen[v as usize] = true;
         }
     }
@@ -1059,7 +1099,11 @@ mod tests {
         // hamming_decode() above.
         for nibble in 0u8..16 {
             let cw = test_encode_hamming_84(nibble);
-            assert_eq!(hamming_decode(&[cw], 8)[0], nibble, "clean decode failed for {nibble}");
+            assert_eq!(
+                hamming_decode(&[cw], 8)[0],
+                nibble,
+                "clean decode failed for {nibble}"
+            );
             for bit in 0..8 {
                 let corrupted = cw ^ (1 << bit);
                 assert_eq!(
@@ -1076,7 +1120,11 @@ mod tests {
         // n=7 (CR=4/7): same check, 7-bit codeword.
         for nibble in 0u8..16 {
             let cw = test_encode_hamming_74(nibble);
-            assert_eq!(hamming_decode(&[cw], 7)[0], nibble, "clean decode failed for {nibble}");
+            assert_eq!(
+                hamming_decode(&[cw], 7)[0],
+                nibble,
+                "clean decode failed for {nibble}"
+            );
             for bit in 0..7 {
                 let corrupted = cw ^ (1 << bit);
                 assert_eq!(
@@ -1128,10 +1176,18 @@ mod tests {
 
     #[test]
     fn encode_then_decode_round_trips() {
-        let cfg = LoraConfig { spreading_factor: 11, bandwidth_hz: 250_000, coding_rate: 5, freq_hz: 869_525_000 };
+        let cfg = LoraConfig {
+            spreading_factor: 11,
+            bandwidth_hz: 250_000,
+            coding_rate: 5,
+            freq_hz: 869_525_000,
+        };
         let payload = b"hello mesh";
         let iq_samples = super::encode_packet(payload, &cfg);
-        let iq = super::IqBuffer { samples: &iq_samples, sample_rate_hz: 250_000 };
+        let iq = super::IqBuffer {
+            samples: &iq_samples,
+            sample_rate_hz: 250_000,
+        };
         let decoded_opt = super::try_decode_packet(&iq, &cfg);
 
         if decoded_opt.is_none() {

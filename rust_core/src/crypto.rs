@@ -121,12 +121,7 @@ fn build_iv(sender_node_num: u32, packet_id: u32) -> [u8; 16] {
 
 /// Encrypts or decrypts a SubPacket payload in place. CTR mode is its own
 /// inverse, so the same function does both directions.
-pub fn crypt_payload(
-    key: &ChannelKey,
-    sender_node_num: u32,
-    packet_id: u32,
-    payload: &mut [u8],
-) {
+pub fn crypt_payload(key: &ChannelKey, sender_node_num: u32, packet_id: u32, payload: &mut [u8]) {
     let iv = build_iv(sender_node_num, packet_id);
     match key {
         ChannelKey::Aes256(k) => {
