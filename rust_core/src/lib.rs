@@ -2,14 +2,14 @@ pub mod crypto;
 pub mod lora_phy;
 pub mod packet;
 
+use jni::objects::{JByteArray, JClass, JString, JValue};
 use jni::JNIEnv;
-use jni::objects::{JClass, JByteArray, JValue, JString};
+use num_complex::Complex32;
+use packet::proto::mesh_packet::PayloadVariant;
+use serde::Serialize;
 use std::panic;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use num_complex::Complex32;
-use serde::Serialize;
-use packet::proto::mesh_packet::PayloadVariant;
 
 static CURRENT_FREQ_HZ: AtomicU64 = AtomicU64::new(869_525_000);
 
@@ -67,7 +67,10 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
     from_node_id: jni::sys::jint,
 ) -> jni::sys::jbyteArray {
     let result = panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let text_str: String = env.get_string(&text).expect("Couldn't get java string").into();
+        let text_str: String = env
+            .get_string(&text)
+            .expect("Couldn't get java string")
+            .into();
 
         let mut data = packet::proto::Data::default();
         data.portnum = 1; // TEXT_MESSAGE_APP
@@ -78,7 +81,8 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
         mesh_packet.to = 0xFFFFFFFF; // broadcast by default for mesh
         mesh_packet.id = rand::rng().random::<u32>();
         mesh_packet.hop_limit = 3;
-        mesh_packet.payload_variant = Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
+        mesh_packet.payload_variant =
+            Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
         let (ch_name, ch_psk) = {
             if let Ok(channel) = CURRENT_CHANNEL.lock() {
@@ -88,7 +92,8 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
             }
         };
 
-        let key = crypto::resolve_psk(&ch_psk).unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap());
+        let key =
+            crypto::resolve_psk(&ch_psk).unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap());
         let encoded_bytes = packet::encode_mesh_packet(mesh_packet, &ch_name, &key);
 
         let cfg = lora_phy::LoraConfig {
@@ -108,7 +113,9 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
             out_bytes.push(im_clamped as u8);
         }
 
-        let jbyte_array = env.byte_array_from_slice(&out_bytes).expect("Failed to create byte array");
+        let jbyte_array = env
+            .byte_array_from_slice(&out_bytes)
+            .expect("Failed to create byte array");
         jbyte_array
     }));
 
@@ -157,13 +164,14 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
                 let known_channels = vec![
                     packet::KnownChannel {
                         name: ch_name,
-                        key: crypto::resolve_psk(&ch_psk).unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap()),
+                        key: crypto::resolve_psk(&ch_psk)
+                            .unwrap_or_else(|| crypto::resolve_psk(&[1]).unwrap()),
                     },
                     // Fallback to LongFast always if custom fails
                     packet::KnownChannel {
                         name: "LongFast".to_string(),
                         key: crypto::resolve_psk(&[1]).unwrap(),
-                    }
+                    },
                 ];
 
                 let msg = match packet::decode_mesh_packet(&payload, &known_channels) {
@@ -186,7 +194,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
                         }
 
                         serde_json::to_string(&parsed).unwrap_or_else(|_| "{}".to_string())
-                    },
+                    }
                     Err(e) => format!("{{\"error\": \"{:?}\"}}", e),
                 };
 
