@@ -39,6 +39,7 @@ use proto::{mesh_packet::PayloadVariant, Data, MeshPacket};
 pub enum PacketError {
     Protobuf(prost::DecodeError),
     NoMatchingChannelKey,
+    PacketTooShort,
 }
 
 impl From<prost::DecodeError> for PacketError {
@@ -61,50 +62,136 @@ pub fn decode_mesh_packet(
     bytes: &[u8],
     known_channels: &[KnownChannel],
 ) -> Result<MeshPacket, PacketError> {
-    let mut packet = MeshPacket::decode(bytes)?;
-
-    if let Some(PayloadVariant::Encrypted(ciphertext)) = &packet.payload_variant {
-        let target_hash = packet.channel as u8;
-        for kc in known_channels {
-            let psk_bytes: &[u8] = match &kc.key {
-                ChannelKey::Aes256(k) => k,
-                ChannelKey::Aes128(k) => k,
-            };
-            if crypto::channel_hash(&kc.name, psk_bytes) != target_hash {
-                continue;
-            }
-            let mut plaintext = ciphertext.clone();
-            crypto::crypt_payload(&kc.key, packet.from, packet.id, &mut plaintext);
-            if let Ok(data) = Data::decode(plaintext.as_slice()) {
-                packet.payload_variant = Some(PayloadVariant::Decoded(data));
-                return Ok(packet);
-            }
-        }
-        return Err(PacketError::NoMatchingChannelKey);
+    if bytes.len() < 16 {
+        return Err(PacketError::PacketTooShort);
     }
 
-    Ok(packet) // already cleartext, or no payload
+    let to = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
+    let from = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    let id = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
+
+    let flags = bytes[12];
+    let hop_limit = (flags & 0x07) as u32;
+    let want_ack = (flags & 0x40) != 0;
+
+    let target_hash = bytes[13];
+    let ciphertext = &bytes[16..];
+
+    for kc in known_channels {
+        let psk_bytes: &[u8] = match &kc.key {
+            ChannelKey::Aes256(k) => k,
+            ChannelKey::Aes128(k) => k,
+        };
+        if crypto::channel_hash(&kc.name, psk_bytes) != target_hash {
+            continue;
+        }
+        let mut plaintext = ciphertext.to_vec();
+        crypto::crypt_payload(&kc.key, from, id, &mut plaintext);
+        if let Ok(data) = Data::decode(plaintext.as_slice()) {
+            let mut packet = MeshPacket::default();
+            packet.to = to;
+            packet.from = from;
+            packet.id = id;
+            packet.hop_limit = hop_limit;
+            packet.want_ack = want_ack;
+            packet.channel = target_hash as u32;
+            packet.payload_variant = Some(PayloadVariant::Decoded(data));
+            return Ok(packet);
+        }
+    }
+
+    Err(PacketError::NoMatchingChannelKey)
 }
 
 /// Encodes a MeshPacket back to wire bytes, encrypting the Decoded payload
 /// against the given channel first.
-pub fn encode_mesh_packet(mut packet: MeshPacket, channel_name: &str, key: &ChannelKey) -> Vec<u8> {
+pub fn encode_mesh_packet(packet: MeshPacket, channel_name: &str, key: &ChannelKey) -> Vec<u8> {
+    let mut out = vec![0u8; 16];
+    out[0..4].copy_from_slice(&packet.to.to_le_bytes());
+    out[4..8].copy_from_slice(&packet.from.to_le_bytes());
+    out[8..12].copy_from_slice(&packet.id.to_le_bytes());
+
+    let mut flags = (packet.hop_limit & 0x07) as u8;
+    // According to the protocol, max_hops (or hop_start) is also usually set to the initial hop_limit.
+    flags |= ((packet.hop_limit & 0x07) as u8) << 3;
+    if packet.want_ack {
+        flags |= 0x40;
+    }
+    out[12] = flags;
+
+    let psk_bytes: &[u8] = match key {
+        ChannelKey::Aes256(k) => k,
+        ChannelKey::Aes128(k) => k,
+    };
+    out[13] = crypto::channel_hash(channel_name, psk_bytes);
+
+    out[14] = 0;
+    out[15] = 0;
+
     if let Some(PayloadVariant::Decoded(data)) = &packet.payload_variant {
         let mut plaintext = Vec::new();
         data.encode(&mut plaintext)
             .expect("Data encode should not fail");
         crypto::crypt_payload(key, packet.from, packet.id, &mut plaintext);
-
-        let psk_bytes: &[u8] = match key {
-            ChannelKey::Aes256(k) => k,
-            ChannelKey::Aes128(k) => k,
-        };
-        packet.channel = crypto::channel_hash(channel_name, psk_bytes) as u32;
-        packet.payload_variant = Some(PayloadVariant::Encrypted(plaintext));
+        out.extend_from_slice(&plaintext);
+    } else if let Some(PayloadVariant::Encrypted(ciphertext)) = &packet.payload_variant {
+        out.extend_from_slice(ciphertext);
     }
-    let mut out = Vec::new();
-    packet
-        .encode(&mut out)
-        .expect("MeshPacket encode should not fail");
+
     out
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::resolve_psk;
+
+    #[test]
+    fn test_encode_decode_mesh_packet() {
+        let mut data = Data::default();
+        data.portnum = 1;
+        data.payload = b"Hello".to_vec();
+
+        let mut packet = MeshPacket::default();
+        packet.to = 0xFFFFFFFF;
+        packet.from = 0x12345678;
+        packet.id = 0x87654321;
+        packet.hop_limit = 3;
+        packet.want_ack = true;
+        packet.payload_variant = Some(PayloadVariant::Decoded(data));
+
+        let key = resolve_psk(&[1]).unwrap(); // Default key
+        let encoded = encode_mesh_packet(packet, "LongFast", &key);
+
+        // Assert header length is minimum 16
+        assert!(encoded.len() >= 16);
+
+        // Assert header contents
+        assert_eq!(encoded[0..4], 0xFFFFFFFFu32.to_le_bytes());
+        assert_eq!(encoded[4..8], 0x12345678u32.to_le_bytes());
+        assert_eq!(encoded[8..12], 0x87654321u32.to_le_bytes());
+
+        // Expected flags for hop_limit=3, want_ack=true
+        let expected_flags = 3 | (3 << 3) | 0x40;
+        assert_eq!(encoded[12], expected_flags);
+
+        let known_channels = vec![KnownChannel {
+            name: "LongFast".to_string(),
+            key: resolve_psk(&[1]).unwrap(),
+        }];
+
+        let decoded = decode_mesh_packet(&encoded, &known_channels).expect("decode failed");
+
+        assert_eq!(decoded.to, 0xFFFFFFFF);
+        assert_eq!(decoded.from, 0x12345678);
+        assert_eq!(decoded.id, 0x87654321);
+        assert_eq!(decoded.hop_limit, 3);
+        assert_eq!(decoded.want_ack, true);
+
+        if let Some(PayloadVariant::Decoded(d)) = decoded.payload_variant {
+            assert_eq!(d.portnum, 1);
+            assert_eq!(d.payload, b"Hello");
+        } else {
+            panic!("Expected Decoded payload variant");
+        }
+    }
 }
