@@ -1,0 +1,103 @@
+--- rust_core/src/lora_phy.rs
++++ rust_core/src/lora_phy.rs
+@@ -785,6 +785,14 @@
+     res
+ }
+
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub enum DecodeError {
++    NoPreamble,
++    Incomplete(usize),
++    HeaderCrcFailed(usize),
++    InvalidCodingRate(usize),
++    PayloadCrcFailed(usize),
++}
++
+ /// Top-level RX entry point wiring the stages above in order. Once this
+ /// returns Some(bytes), hand them to packet::decode_mesh_packet() and, if
+ /// the channel is encrypted, crypto::crypt_payload() (see crypto.rs) to get
+@@ -795,16 +803,19 @@
+ /// parameters (CR=4/8, n=8) to learn the actual payload length and coding_rate,
+ /// and THEN decodes the remaining symbols (the payload) with those
+ /// dynamically recovered parameters.
+-pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
+-    let start = detect_preamble(iq, cfg)?;
++pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Result<Vec<u8>, DecodeError> {
++    let start = match detect_preamble(iq, cfg) {
++        Some(s) => s,
++        None => return Err(DecodeError::NoPreamble),
++    };
++
+     let (cfo, sto) = estimate_cfo_sto(iq, start, cfg);
+     let raw_symbols = dechirp_symbols(iq, start, cfo, sto, cfg);
+     let symbols = gray_demap(&raw_symbols);
+
+     let sf = cfg.spreading_factor as usize;
+     let header_n = 8; // HEADER_RDD = 4, n = 4 + 4 = 8
+     let n_header_symbols = 8;
+
+     if symbols.len() < n_header_symbols {
+-        return None;
++        return Err(DecodeError::Incomplete(start));
+     }
+
+     // --- PHASE 1: HEADER DECODE ---
+@@ -816,7 +827,7 @@
+     // However, deinterleave will give us `sf` codewords. We only need the first 5.
+     if header_codewords.len() < 5 {
+-        return None;
++        return Err(DecodeError::Incomplete(start));
+     }
+
+     // decodeHamming84sx returns the decoded nibble
+@@ -839,7 +850,7 @@
+     let actual_checksum = ((dewhitened_header[1] >> 4) & 0x0f) | ((dewhitened_header[2] & 0x01) << 4);
+
+     if actual_checksum != expected_checksum {
+-        return None; // Header CRC failed
++        return Err(DecodeError::HeaderCrcFailed(start));
+     }
+
+     let payload_len = dewhitened_header[0] as usize;
+@@ -848,11 +859,11 @@
+     let payload_n = (4 + rdd) as usize;
+
+     if rdd > 4 {
+-        return None; // invalid coding rate
++        return Err(DecodeError::InvalidCodingRate(start));
+     }
+
+     if rdd == 0 {
+-        return None; // invalid coding rate n=4, decoding expects n in 5..=8
++        return Err(DecodeError::InvalidCodingRate(start));
+     }
+
+     // Compute required number of payload symbols
+@@ -884,18 +895,16 @@
+
+     // Extract payload
+     if dewhitened_all.len() < 3 + payload_len {
+-        return None;
++        return Err(DecodeError::Incomplete(start));
+     }
+
+     let final_payload = dewhitened_all[3..3+payload_len].to_vec();
+
+     if crc_present {
+         // Extract CRC bytes
+         if dewhitened_all.len() < 3 + payload_len + 2 {
+-            return None; // Cannot verify CRC, truncated packet
++            return Err(DecodeError::Incomplete(start));
+         }
+         let data_for_crc = &dewhitened_all[3..3+payload_len+2];
+         if !verify_payload_crc(data_for_crc) {
+-            // Return None on payload CRC mismatch? The prompt didn't say, but Meshtastic drops invalid.
+-            // Let's return None.
+-            return None;
++            return Err(DecodeError::PayloadCrcFailed(start));
+         }
+     }
+
+-    Some(final_payload)
++    Ok(final_payload)
+ }
