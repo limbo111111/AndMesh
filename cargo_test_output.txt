@@ -1,14 +1,18 @@
    Compiling rust_core v0.1.0 (/app/rust_core)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.01s
-     Running unittests src/lib.rs (rust_core/target/debug/deps/rust_core-adcaf4b95390ae79)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.24s
+     Running unittests src/lib.rs (target/debug/deps/rust_core-8579a6fabfaf12b2)
 
-running 7 tests
+running 10 tests
 test lora_phy::tests::dewhiten_is_its_own_inverse ... ok
 test lora_phy::tests::deinterleave_round_trips_via_matching_interleaver ... ok
-test lora_phy::tests::gray_demap_is_a_bijection_over_one_period ... ok
 test lora_phy::tests::gray_demap_matches_lora_sdr_gray_to_binary16 ... ok
-test lora_phy::tests::hamming_decode_74_lossless_and_corrects_single_bit ... ok
+test lora_phy::tests::gray_demap_is_a_bijection_over_one_period ... ok
 test lora_phy::tests::hamming_decode_84_lossless_and_corrects_single_bit ... ok
+test lora_phy::tests::hamming_decode_74_lossless_and_corrects_single_bit ... ok
 test lora_phy::tests::pack_nibbles_to_bytes_lsb_nibble_first ... ok
+test packet::tests::test_encode_decode_mesh_packet ... ok
+test lora_phy::tests::encode_then_decode_round_trips ... ok
+test lora_phy::tests::encode_then_decode_round_trips_oversampled ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

@@ -78,7 +78,7 @@ class HackRfRepository(
         RtlSdrNative.setChannel(channelName, pskBytes)
     }
 
-    private val SAMPLE_RATE = 2000000 // 2 Msps
+    private val SAMPLE_RATE = 8000000 // 8 Msps
 
     fun initialize() {
         Log.d("HackRfRepository", "Initializing HackRF...")

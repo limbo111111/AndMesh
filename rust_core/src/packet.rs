@@ -72,9 +72,13 @@ pub fn decode_mesh_packet(
 
     let flags = bytes[12];
     let hop_limit = (flags & 0x07) as u32;
-    let want_ack = (flags & 0x40) != 0;
+    let want_ack = (flags & 0x08) != 0;
+    let via_mqtt = (flags & 0x10) != 0;
+    let hop_start = ((flags >> 5) & 0x07) as u32;
 
     let target_hash = bytes[13];
+    let next_hop = bytes[14] as u32;
+    let relay_node = bytes[15] as u32;
     let ciphertext = &bytes[16..];
 
     for kc in known_channels {
@@ -93,8 +97,12 @@ pub fn decode_mesh_packet(
             packet.from = from;
             packet.id = id;
             packet.hop_limit = hop_limit;
+            packet.hop_start = hop_start;
             packet.want_ack = want_ack;
+            packet.via_mqtt = via_mqtt;
             packet.channel = target_hash as u32;
+            packet.next_hop = next_hop;
+            packet.relay_node = relay_node;
             packet.payload_variant = Some(PayloadVariant::Decoded(data));
             return Ok(packet);
         }
@@ -112,11 +120,13 @@ pub fn encode_mesh_packet(packet: MeshPacket, channel_name: &str, key: &ChannelK
     out[8..12].copy_from_slice(&packet.id.to_le_bytes());
 
     let mut flags = (packet.hop_limit & 0x07) as u8;
-    // According to the protocol, max_hops (or hop_start) is also usually set to the initial hop_limit.
-    flags |= ((packet.hop_limit & 0x07) as u8) << 3;
     if packet.want_ack {
-        flags |= 0x40;
+        flags |= 0x08;
     }
+    if packet.via_mqtt {
+        flags |= 0x10;
+    }
+    flags |= ((packet.hop_start & 0x07) as u8) << 5;
     out[12] = flags;
 
     let psk_bytes: &[u8] = match key {
@@ -125,8 +135,8 @@ pub fn encode_mesh_packet(packet: MeshPacket, channel_name: &str, key: &ChannelK
     };
     out[13] = crypto::channel_hash(channel_name, psk_bytes);
 
-    out[14] = 0;
-    out[15] = 0;
+    out[14] = packet.next_hop as u8;
+    out[15] = packet.relay_node as u8;
 
     if let Some(PayloadVariant::Decoded(data)) = &packet.payload_variant {
         let mut plaintext = Vec::new();
@@ -156,7 +166,11 @@ mod tests {
         packet.from = 0x12345678;
         packet.id = 0x87654321;
         packet.hop_limit = 3;
+        packet.hop_start = 3;
         packet.want_ack = true;
+        packet.via_mqtt = true;
+        packet.next_hop = 42;
+        packet.relay_node = 43;
         packet.payload_variant = Some(PayloadVariant::Decoded(data));
 
         let key = resolve_psk(&[1]).unwrap(); // Default key
@@ -170,8 +184,8 @@ mod tests {
         assert_eq!(encoded[4..8], 0x12345678u32.to_le_bytes());
         assert_eq!(encoded[8..12], 0x87654321u32.to_le_bytes());
 
-        // Expected flags for hop_limit=3, want_ack=true
-        let expected_flags = 3 | (3 << 3) | 0x40;
+        // Expected flags for hop_limit=3, hop_start=3, want_ack=true, via_mqtt=true
+        let expected_flags = 3 | 0x08 | 0x10 | (3 << 5);
         assert_eq!(encoded[12], expected_flags);
 
         let known_channels = vec![KnownChannel {
@@ -185,7 +199,11 @@ mod tests {
         assert_eq!(decoded.from, 0x12345678);
         assert_eq!(decoded.id, 0x87654321);
         assert_eq!(decoded.hop_limit, 3);
+        assert_eq!(decoded.hop_start, 3);
         assert_eq!(decoded.want_ack, true);
+        assert_eq!(decoded.via_mqtt, true);
+        assert_eq!(decoded.next_hop, 42);
+        assert_eq!(decoded.relay_node, 43);
 
         if let Some(PayloadVariant::Decoded(d)) = decoded.payload_variant {
             assert_eq!(d.portnum, 1);
