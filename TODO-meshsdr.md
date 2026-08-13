@@ -37,13 +37,13 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 - ✅ `MeshSdrService.kt`: `HackRfRepository` ist eingebunden und initialisiert.
 - ✅ `TacticalMainScreen.kt`: Nutzt jetzt dynamische Daten (Nodes/Messages) via `TacticalViewModel` statt Hardcodes.
 - ✅ Weitere Screens im Aussehen-#2-Look: Nachrichten-Thread (im Main integriert)
-- ❌ Kanal-/PSK-Einstellungen (`TacticalSettingsScreen` bietet aktuell nur Frequenz, keine echte Kanal/PSK-Eingabe).
+- ✅ Kanal-/PSK-Einstellungen (`TacticalSettingsScreen` bietet aktuell Frequenz und Kanal/PSK-Eingabe).
 - ✅ Echtes Notification-Icon statt Platzhalter (aktuell `ic_menu_compass`)
 - ✅ `AndroidManifest.xml`: Service mit `foregroundServiceType="connectedDevice"` und USB-Host-Features sind eingerichtet.
 - ✅ Frequenz/Region konfigurierbar machen (JNI und HackRfRepository unterstützen nun dynamische Frequenz).
 
 ## Noch gar nicht angefangen
-- ✅ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `NodeEntity`).
+- ❌ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `NodeEntity`).
 - ✅ USB-Berechtigungsdialog (via `hackrf_android` / Manifest intent-filter).
 - ✅ Android 13+ Notification-Runtime-Permission
 - ❌ Flood-Routing, falls "vollwertiger" Routing-Node gewünscht (aktuell nur

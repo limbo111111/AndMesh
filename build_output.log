@@ -1,137 +1,98 @@
-> Task :rust_core:preBuild UP-TO-DATE
-> Task :rust_core:preDebugBuild UP-TO-DATE
-> Task :rust_core:mergeDebugJniLibFolders UP-TO-DATE
-> Task :rust_core:mergeDebugNativeLibs NO-SOURCE
-> Task :rust_core:stripDebugDebugSymbols NO-SOURCE
-> Task :rust_core:generateDebugResValues UP-TO-DATE
-> Task :rust_core:copyDebugJniLibsProjectAndLocalJars
-> Task :rust_core:generateDebugResources UP-TO-DATE
-> Task :rust_core:packageDebugResources UP-TO-DATE
-> Task :rust_core:parseDebugLocalResources UP-TO-DATE
-> Task :rust_core:generateDebugRFile UP-TO-DATE
-> Task :rust_core:extractDebugAnnotations
-> Task :rust_core:extractDeepLinksForAarDebug
-> Task :rust_core:javaPreCompileDebug UP-TO-DATE
-> Task :rust_core:compileDebugJavaWithJavac NO-SOURCE
-> Task :rust_core:mergeDebugGeneratedProguardFiles
-> Task :rust_core:mergeDebugConsumerProguardFiles
-> Task :rust_core:mergeDebugShaders UP-TO-DATE
-> Task :rust_core:compileDebugShaders NO-SOURCE
-> Task :rust_core:generateDebugAssets UP-TO-DATE
-> Task :rust_core:packageDebugAssets UP-TO-DATE
-> Task :rust_core:prepareDebugArtProfile
-> Task :rust_core:processDebugManifest UP-TO-DATE
-> Task :rust_core:prepareLintJarForPublish
-> Task :rust_core:processDebugJavaRes NO-SOURCE
-> Task :rust_core:writeDebugAarMetadata UP-TO-DATE
+> Task :app:clean
+> Task :rust_core:clean
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :rust_core:preBuild UP-TO-DATE
+> Task :rust_core:preDebugBuild UP-TO-DATE
+> Task :rust_core:writeDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :rust_core:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :rust_core:generateDebugResources
+> Task :rust_core:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :rust_core:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :rust_core:processDebugManifest
+> Task :rust_core:compileDebugLibraryResources
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :rust_core:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :rust_core:parseDebugLocalResources
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :rust_core:mergeDebugShaders
+> Task :rust_core:generateDebugRFile
+> Task :rust_core:compileDebugShaders NO-SOURCE
+> Task :rust_core:compileDebugJavaWithJavac NO-SOURCE
+> Task :rust_core:generateDebugAssets UP-TO-DATE
+> Task :rust_core:bundleLibCompileToJarDebug
+> Task :rust_core:packageDebugAssets
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :rust_core:processDebugJavaRes NO-SOURCE
+> Task :rust_core:bundleLibRuntimeToDirDebug
+> Task :app:checkDebugDuplicateClasses
+> Task :app:desugarDebugFileDependencies
+> Task :app:processDebugResources
+
+> Task :rust_core:cargoBuild
+Building Rust core module for Android using cargo-ndk...
+    Building arm64-v8a (aarch64-linux-android)
+   Compiling rust_core v0.1.0 (/app/rust_core)
+    Finished `release` profile [optimized] target(s) in 15.16s
+    Building armeabi-v7a (armv7-linux-androideabi)
+   Compiling rust_core v0.1.0 (/app/rust_core)
+    Finished `release` profile [optimized] target(s) in 6.67s
+    Building x86 (i686-linux-android)
+   Compiling rust_core v0.1.0 (/app/rust_core)
+    Finished `release` profile [optimized] target(s) in 6.91s
+    Building x86_64 (x86_64-linux-android)
+   Compiling rust_core v0.1.0 (/app/rust_core)
+    Finished `release` profile [optimized] target(s) in 15.65s
+     Copying libraries to /app/app/src/main/jniLibs
+
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :rust_core:mergeDebugJniLibFolders
+> Task :rust_core:mergeDebugNativeLibs NO-SOURCE
+> Task :rust_core:copyDebugJniLibsProjectOnly
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :rust_core:stripDebugDebugSymbols NO-SOURCE
+> Task :rust_core:copyDebugJniLibsProjectAndLocalJars
+> Task :app:mergeDebugNativeLibs
+> Task :rust_core:extractDebugAnnotations
+> Task :rust_core:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :rust_core:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :rust_core:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :rust_core:prepareDebugArtProfile UP-TO-DATE
+> Task :rust_core:prepareLintJarForPublish UP-TO-DATE
+> Task :app:stripDebugDebugSymbols
 > Task :rust_core:mergeDebugJavaResource
-> Task :app:checkDebugAarMetadata UP-TO-DATE
 > Task :rust_core:syncDebugLibJars
-> Task :rust_core:bundleDebugLocalLintAar
-> Task :app:generateDebugResValues UP-TO-DATE
-> Task :app:mapDebugSourceSetPaths UP-TO-DATE
-> Task :app:generateDebugResources UP-TO-DATE
-> Task :app:mergeDebugResources UP-TO-DATE
-> Task :app:packageDebugResources UP-TO-DATE
-> Task :app:parseDebugLocalResources UP-TO-DATE
-> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
-> Task :app:extractDeepLinksDebug UP-TO-DATE
-> Task :rust_core:extractDeepLinksDebug UP-TO-DATE
-> Task :app:processDebugMainManifest UP-TO-DATE
-> Task :app:processDebugManifest UP-TO-DATE
-> Task :app:processDebugManifestForPackage UP-TO-DATE
-> Task :rust_core:compileDebugLibraryResources UP-TO-DATE
-> Task :app:processDebugResources UP-TO-DATE
-> Task :rust_core:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :app:compileDebugKotlin UP-TO-DATE
-> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :rust_core:bundleDebugAar
+> Task :rust_core:assembleDebug
+> Task :app:mergeExtDexDebug
+> Task :app:compileDebugKotlin
 > Task :app:compileDebugJavaWithJavac NO-SOURCE
-> Task :app:preDebugAndroidTestBuild SKIPPED
-> Task :app:generateDebugAndroidTestResValues
-> Task :rust_core:writeDebugLintModelMetadata
-> Task :rust_core:bundleLibRuntimeToJarDebug
-> Task :rust_core:createFullJarDebug
-> Task :app:bundleDebugClassesToCompileJar
-> Task :app:extractProguardFiles
+> Task :app:processDebugJavaRes
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
 
-> Task :app:generateDebugAndroidTestLintModel
-Generating lint files for backported methods only (compile API B)
-
-> Task :rust_core:extractProguardFiles
-> Task :rust_core:generateDebugLintModel
-> Task :app:generateDebugLintReportModel
-> Task :app:preDebugUnitTestBuild UP-TO-DATE
-> Task :app:generateDebugUnitTestLintModel
-> Task :rust_core:preDebugAndroidTestBuild UP-TO-DATE
-> Task :rust_core:generateDebugAndroidTestResValues
-> Task :rust_core:generateDebugAndroidTestLintModel
-> Task :rust_core:preDebugUnitTestBuild UP-TO-DATE
-> Task :rust_core:generateDebugUnitTestLintModel
-> Task :app:bundleDebugClassesToRuntimeJar
-> Task :app:compileDebugUnitTestKotlin NO-SOURCE
-> Task :app:javaPreCompileDebugUnitTest
-> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
-> Task :app:processDebugJavaRes UP-TO-DATE
-> Task :app:processDebugUnitTestJavaRes NO-SOURCE
-> Task :app:testDebugUnitTest NO-SOURCE
-> Task :app:buildKotlinToolingMetadata
-> Task :app:preReleaseBuild UP-TO-DATE
-> Task :rust_core:preReleaseBuild UP-TO-DATE
-> Task :rust_core:writeReleaseAarMetadata
-> Task :app:checkReleaseAarMetadata
-> Task :app:generateReleaseResValues
-> Task :rust_core:generateReleaseResValues
-> Task :rust_core:generateReleaseResources
-> Task :rust_core:packageReleaseResources
-> Task :app:mapReleaseSourceSetPaths
-> Task :app:generateReleaseResources
-> Task :app:mergeReleaseResources
-> Task :app:packageReleaseResources
-> Task :app:parseReleaseLocalResources
-> Task :app:createReleaseCompatibleScreenManifests
-> Task :app:extractDeepLinksRelease
-> Task :rust_core:extractDeepLinksRelease
-> Task :rust_core:processReleaseManifest
-> Task :app:processReleaseMainManifest
-> Task :app:processReleaseManifest
-> Task :app:processReleaseManifestForPackage
-> Task :rust_core:compileReleaseLibraryResources
-> Task :rust_core:parseReleaseLocalResources
-> Task :rust_core:generateReleaseRFile
-> Task :app:processReleaseResources
-> Task :rust_core:javaPreCompileRelease
-> Task :rust_core:compileReleaseJavaWithJavac NO-SOURCE
-> Task :rust_core:bundleLibCompileToJarRelease
-> Task :app:compileReleaseKotlin
-> Task :app:javaPreCompileRelease
-> Task :app:compileReleaseJavaWithJavac NO-SOURCE
-> Task :app:bundleReleaseClassesToRuntimeJar
-> Task :app:bundleReleaseClassesToCompileJar
-> Task :app:compileReleaseUnitTestKotlin NO-SOURCE
-> Task :app:preReleaseUnitTestBuild UP-TO-DATE
-> Task :app:javaPreCompileReleaseUnitTest
-> Task :app:compileReleaseUnitTestJavaWithJavac NO-SOURCE
-> Task :app:processReleaseJavaRes
-> Task :app:processReleaseUnitTestJavaRes NO-SOURCE
-> Task :rust_core:bundleLibRuntimeToJarRelease
-> Task :rust_core:processReleaseJavaRes NO-SOURCE
-> Task :app:testReleaseUnitTest NO-SOURCE
-> Task :app:test UP-TO-DATE
-> Task :app:lintAnalyzeDebugUnitTest
-> Task :app:lintAnalyzeDebugAndroidTest
-> Task :rust_core:lintAnalyzeDebug
-> Task :rust_core:lintAnalyzeDebugUnitTest
-> Task :rust_core:lintAnalyzeDebugAndroidTest
-> Task :app:lintAnalyzeDebug
-
-> Task :app:lintReportDebug
-Wrote HTML report to file:///app/app/build/reports/lint-results-debug.html
-
-> Task :app:lintDebug
-> Task :app:lint
-> Task :app:check
-
-BUILD SUCCESSFUL in 41s
-96 actionable tasks: 66 executed, 30 up-to-date
+BUILD SUCCESSFUL in 56s
+63 actionable tasks: 58 executed, 5 up-to-date

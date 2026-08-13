@@ -815,6 +815,16 @@ pub fn header_checksum(h0: u8, h1_low_nibble: u8) -> u8 {
     res
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DecodeError {
+    NoPreamble,
+    Incomplete(usize),
+    HeaderCrcFailed(usize),
+    InvalidCodingRate(usize),
+    PayloadCrcFailed(usize),
+}
+
 /// Top-level RX entry point wiring the stages above in order. Once this
 /// returns Some(bytes), hand them to packet::decode_mesh_packet() and, if
 /// the channel is encrypted, crypto::crypt_payload() (see crypto.rs) to get
@@ -825,10 +835,45 @@ pub fn header_checksum(h0: u8, h1_low_nibble: u8) -> u8 {
 /// parameters (CR=4/8, n=8) to learn the actual payload length and coding_rate,
 /// and THEN decodes the remaining symbols (the payload) with those
 /// dynamically recovered parameters.
-pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
-    let start = detect_preamble(iq, cfg)?;
-    let (cfo, sto) = estimate_cfo_sto(iq, start, cfg);
-    let raw_symbols = dechirp_symbols(iq, start, cfo, sto, cfg);
+
+/// Decimate the input IQ stream by a given integer factor using a single-stage CIC
+/// (moving average / boxcar filter) to prevent aliasing, followed by downsampling.
+/// The window length equals the decimation factor `n`, placing the filter's zeros
+/// exactly at multiples of the new sample rate.
+pub fn decimate(samples: &[Complex32], n: usize) -> Vec<Complex32> {
+    if n <= 1 {
+        return samples.to_vec();
+    }
+    let mut out = Vec::with_capacity(samples.len() / n);
+    let n_f32 = n as f32;
+    for chunk in samples.chunks_exact(n) {
+        let mut sum_re = 0.0;
+        let mut sum_im = 0.0;
+        for s in chunk {
+            sum_re += s.re;
+            sum_im += s.im;
+        }
+        out.push(Complex32::new(sum_re / n_f32, sum_im / n_f32));
+    }
+    out
+}
+
+pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Result<Vec<u8>, DecodeError> {
+    let downsampled_samples: Vec<Complex32>;
+    let working_iq = if iq.sample_rate_hz > cfg.bandwidth_hz {
+        let factor = (iq.sample_rate_hz / cfg.bandwidth_hz) as usize;
+        downsampled_samples = decimate(iq.samples, factor);
+        IqBuffer { samples: &downsampled_samples, sample_rate_hz: cfg.bandwidth_hz }
+    } else {
+        IqBuffer { samples: iq.samples, sample_rate_hz: iq.sample_rate_hz }
+    };
+
+    let start = match detect_preamble(&working_iq, cfg) {
+        Some(s) => s,
+        None => return Err(DecodeError::NoPreamble),
+    };
+    let (cfo, sto) = estimate_cfo_sto(&working_iq, start, cfg);
+    let raw_symbols = dechirp_symbols(&working_iq, start, cfo, sto, cfg);
     let symbols = gray_demap(&raw_symbols);
 
     let sf = cfg.spreading_factor as usize;
@@ -836,7 +881,7 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     let n_header_symbols = 8;
 
     if symbols.len() < n_header_symbols {
-        return None;
+        return Err(DecodeError::Incomplete(start));
     }
 
     // --- PHASE 1: HEADER DECODE ---
@@ -847,7 +892,7 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     // with N_HEADER_SYMBOLS = 8.
     // However, deinterleave will give us `sf` codewords. We only need the first 5.
     if header_codewords.len() < 5 {
-        return None;
+        return Err(DecodeError::Incomplete(start));
     }
 
     // decodeHamming84sx returns the decoded nibble
@@ -870,7 +915,7 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
         ((dewhitened_header[1] >> 4) & 0x0f) | ((dewhitened_header[2] & 0x01) << 4);
 
     if actual_checksum != expected_checksum {
-        return None; // Header CRC failed
+        return Err(DecodeError::HeaderCrcFailed(start));
     }
 
     let payload_len = dewhitened_header[0] as usize;
@@ -879,11 +924,11 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     let payload_n = (4 + rdd) as usize;
 
     if rdd > 4 {
-        return None; // invalid coding rate
+        return Err(DecodeError::InvalidCodingRate(start)); // invalid coding rate
     }
 
     if rdd == 0 {
-        return None; // invalid coding rate n=4, decoding expects n in 5..=8
+        return Err(DecodeError::InvalidCodingRate(start)); // invalid coding rate n=4, decoding expects n in 5..=8
     }
 
     // Compute required number of payload symbols
@@ -915,7 +960,7 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
 
     // Extract payload
     if dewhitened_all.len() < 3 + payload_len {
-        return None;
+        return Err(DecodeError::Incomplete(start));
     }
 
     let final_payload = dewhitened_all[3..3 + payload_len].to_vec();
@@ -923,17 +968,17 @@ pub fn try_decode_packet(iq: &IqBuffer, cfg: &LoraConfig) -> Option<Vec<u8>> {
     if crc_present {
         // Extract CRC bytes
         if dewhitened_all.len() < 3 + payload_len + 2 {
-            return None; // Cannot verify CRC, truncated packet
+            return Err(DecodeError::Incomplete(start));
         }
         let data_for_crc = &dewhitened_all[3..3 + payload_len + 2];
         if !verify_payload_crc(data_for_crc) {
             // Return None on payload CRC mismatch? The prompt didn't say, but Meshtastic drops invalid.
             // Let's return None.
-            return None;
+            return Err(DecodeError::PayloadCrcFailed(start));
         }
     }
 
-    Some(final_payload)
+    Ok(final_payload)
 }
 
 pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
@@ -1188,13 +1233,50 @@ mod tests {
             samples: &iq_samples,
             sample_rate_hz: 250_000,
         };
-        let decoded_opt = super::try_decode_packet(&iq, &cfg);
+        let decoded_res = super::try_decode_packet(&iq, &cfg);
 
-        if decoded_opt.is_none() {
-            println!("Decode returned None!");
+        if decoded_res.is_err() {
+            println!("Decode returned Err! {:?}", decoded_res);
         }
 
-        let decoded = decoded_opt.expect("decode failed");
+        let decoded = decoded_res.expect("decode failed");
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn encode_then_decode_round_trips_oversampled() {
+        // Pure wiring test: simulates a higher sample rate (8 MSps) vs base bandwidth (250 kHz)
+        // by repeating each sample N times (Zero-Order Hold). Since the decimator's boxcar
+        // window size exactly matches N, this is mathematically lossless and tests only the
+        // wiring of `sample_rate_hz` and the decimation step, not true DSP aliasing robustness.
+        let cfg = LoraConfig {
+            spreading_factor: 11,
+            bandwidth_hz: 250_000,
+            coding_rate: 5,
+            freq_hz: 869_525_000,
+        };
+        let payload = b"oversampled mesh";
+        let base_iq_samples = super::encode_packet(payload, &cfg);
+
+        let oversample_factor = 32; // 8 MHz / 250 kHz
+        let mut oversampled_iq = Vec::with_capacity(base_iq_samples.len() * oversample_factor);
+        for s in base_iq_samples {
+            for _ in 0..oversample_factor {
+                oversampled_iq.push(s.clone());
+            }
+        }
+
+        let iq = super::IqBuffer {
+            samples: &oversampled_iq,
+            sample_rate_hz: 8_000_000,
+        };
+        let decoded_res = super::try_decode_packet(&iq, &cfg);
+
+        if decoded_res.is_err() {
+            println!("Decode returned Err! {:?}", decoded_res);
+        }
+
+        let decoded = decoded_res.expect("decode failed");
         assert_eq!(decoded, payload);
     }
 }

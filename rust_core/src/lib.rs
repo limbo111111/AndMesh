@@ -81,6 +81,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
         mesh_packet.to = 0xFFFFFFFF; // broadcast by default for mesh
         mesh_packet.id = rand::rng().random::<u32>();
         mesh_packet.hop_limit = 3;
+        mesh_packet.hop_start = 3;
         mesh_packet.payload_variant =
             Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
@@ -142,7 +143,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
 
             let iq_buf = lora_phy::IqBuffer {
                 samples: &complex_samples,
-                sample_rate_hz: 2_000_000,
+                sample_rate_hz: 8_000_000,
             };
 
             let cfg = lora_phy::LoraConfig {
@@ -152,7 +153,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
                 freq_hz: CURRENT_FREQ_HZ.load(Ordering::Relaxed),
             };
 
-            if let Some(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
+            if let Ok(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
                 let (ch_name, ch_psk) = {
                     if let Ok(channel) = CURRENT_CHANNEL.lock() {
                         (channel.0.clone(), channel.1.clone())
