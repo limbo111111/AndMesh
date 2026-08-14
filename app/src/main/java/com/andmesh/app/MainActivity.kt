@@ -125,7 +125,12 @@ class MainActivity : ComponentActivity() {
                             onPskChanged = { psk ->
                                 meshSdrService?.hackRfRepository?.pskBase64 = psk
                             },
-                            onBackClick = { showSettings = false }
+                            onBackClick = { showSettings = false },
+                            onExitClick = {
+                                val serviceIntent = Intent(this@MainActivity, MeshSdrService::class.java)
+                                stopService(serviceIntent)
+                                finish()
+                            }
                         )
                     } else {
                         TacticalMainScreen(
