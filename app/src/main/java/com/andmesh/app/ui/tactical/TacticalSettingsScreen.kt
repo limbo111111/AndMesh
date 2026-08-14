@@ -23,7 +23,8 @@ fun TacticalSettingsScreen(
     onChannelNameChanged: (String) -> Unit,
     currentPsk: String,
     onPskChanged: (String) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onExitClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -137,22 +138,45 @@ fun TacticalSettingsScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(TacticalColors.OliveDrab)
-                .clickable(onClick = onBackClick)
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "ZURÜCK",
-                color = TacticalColors.TextPrimary,
-                fontFamily = StencilFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                letterSpacing = 1.sp
-            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(TacticalColors.Panel)
+                    .border(1.dp, TacticalColors.OliveDrab)
+                    .clickable(onClick = onExitClick)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "BEENDEN",
+                    color = TacticalColors.Amber,
+                    fontFamily = StencilFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.sp
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(TacticalColors.OliveDrab)
+                    .clickable(onClick = onBackClick)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "ZURÜCK",
+                    color = TacticalColors.TextPrimary,
+                    fontFamily = StencilFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
