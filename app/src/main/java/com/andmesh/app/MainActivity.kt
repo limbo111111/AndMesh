@@ -86,20 +86,19 @@ class MainActivity : ComponentActivity() {
             startMeshSdrService()
         }
 
+        val db = com.andmesh.app.data.local.AppDatabase.getInstance(this)
+        val repository = com.andmesh.app.data.repository.MeshRepository(db)
+
         val viewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return TacticalViewModel() as T
+                return TacticalViewModel(repository) as T
             }
         }).get(TacticalViewModel::class.java)
 
-        RtlSdrNative.packetListener = { packetInfo ->
-            viewModel.onPacketReceived(packetInfo)
-        }
-
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            var showSettings by remember { mutableStateOf(false) }
+            var currentScreen by remember { mutableStateOf("MAIN") } // "MAIN", "SETTINGS", "NODE_DETAIL"
 
             MaterialTheme {
                 Surface(
@@ -110,46 +109,84 @@ class MainActivity : ComponentActivity() {
                     val currentFreqMhz = currentFreq / 1_000_000.0
                     val currentChannel = meshSdrService?.hackRfRepository?.channelName ?: "LongFast"
                     val currentPsk = meshSdrService?.hackRfRepository?.pskBase64 ?: ""
+                    val isRelayEnabled = meshSdrService?.meshRouter?.isRelayEnabled ?: true
 
-                    if (showSettings) {
-                        com.andmesh.app.ui.tactical.TacticalSettingsScreen(
-                            currentFreqHz = currentFreq,
-                            onFrequencySelected = { freq ->
-                                meshSdrService?.hackRfRepository?.frequencyHz = freq
-                            },
-                            currentChannelName = currentChannel,
-                            onChannelNameChanged = { ch ->
-                                meshSdrService?.hackRfRepository?.channelName = ch
-                            },
-                            currentPsk = currentPsk,
-                            onPskChanged = { psk ->
-                                meshSdrService?.hackRfRepository?.pskBase64 = psk
-                            },
-                            onBackClick = { showSettings = false },
-                            onExitClick = {
-                                val serviceIntent = Intent(this@MainActivity, MeshSdrService::class.java)
-                                stopService(serviceIntent)
-                                finish()
+                    when (currentScreen) {
+                        "SETTINGS" -> {
+                            com.andmesh.app.ui.tactical.TacticalSettingsScreen(
+                                currentFreqHz = currentFreq,
+                                onFrequencySelected = { freq ->
+                                    meshSdrService?.hackRfRepository?.frequencyHz = freq
+                                },
+                                currentChannelName = currentChannel,
+                                onChannelNameChanged = { ch ->
+                                    meshSdrService?.hackRfRepository?.channelName = ch
+                                },
+                                currentPsk = currentPsk,
+                                onPskChanged = { psk ->
+                                    meshSdrService?.hackRfRepository?.pskBase64 = psk
+                                },
+                                relayEnabled = isRelayEnabled,
+                                onRelayEnabledChanged = { enabled ->
+                                    meshSdrService?.meshRouter?.isRelayEnabled = enabled
+                                },
+                                onBackClick = { currentScreen = "MAIN" },
+                                onExitClick = {
+                                    val serviceIntent = Intent(this@MainActivity, MeshSdrService::class.java)
+                                    stopService(serviceIntent)
+                                    finish()
+                                }
+                            )
+                        }
+                        "NODE_DETAIL" -> {
+                            val node = uiState.selectedNode
+                            if (node != null) {
+                                com.andmesh.app.ui.tactical.TacticalNodeDetailScreen(
+                                    node = node,
+                                    messages = uiState.selectedNodeMessages,
+                                    onBackClick = {
+                                        viewModel.selectNode(null)
+                                        currentScreen = "MAIN"
+                                    },
+                                    onSendMessage = { text ->
+                                        val nodeId = meshSdrService?.hackRfRepository?.nodeId ?: 0
+                                        viewModel.sendLocalMessage(text, nodeId, node.nodeId)
+                                        meshSdrService?.hackRfRepository?.sendTextMessage(text, nodeId)
+                                    },
+                                    onToggleFavorite = { fav ->
+                                        viewModel.toggleFavorite(node.nodeId, fav)
+                                    },
+                                    onUpdateNotes = { notes ->
+                                        viewModel.updateNotes(node.nodeId, notes)
+                                    }
+                                )
+                            } else {
+                                currentScreen = "MAIN"
                             }
-                        )
-                    } else {
-                        TacticalMainScreen(
-                            hackRfLinked = hackRfLinked,
-                            frequencyMhz = String.format("%.3f", currentFreqMhz),
-                            channelName = currentChannel,
-                            signalDbm = "N/A",
-                            spreadingFactor = "SF11",
-                            nodes = uiState.nodes,
-                            messages = uiState.messages,
-                            onSendClick = { text ->
-                                val nodeId = meshSdrService?.hackRfRepository?.nodeId ?: 0
-                                viewModel.sendLocalMessage(text, nodeId)
-                                meshSdrService?.hackRfRepository?.sendTextMessage(text, nodeId)
-                            },
-                            onSettingsClick = {
-                                showSettings = true
-                            }
-                        )
+                        }
+                        else -> {
+                            TacticalMainScreen(
+                                hackRfLinked = hackRfLinked,
+                                frequencyMhz = String.format("%.3f", currentFreqMhz),
+                                channelName = currentChannel,
+                                signalDbm = "N/A",
+                                spreadingFactor = "SF11",
+                                nodes = uiState.nodes,
+                                messages = uiState.messages,
+                                onSendClick = { text ->
+                                    val nodeId = meshSdrService?.hackRfRepository?.nodeId ?: 0
+                                    viewModel.sendLocalMessage(text, nodeId)
+                                    meshSdrService?.hackRfRepository?.sendTextMessage(text, nodeId)
+                                },
+                                onNodeClick = { nodeId ->
+                                    viewModel.selectNode(nodeId)
+                                    currentScreen = "NODE_DETAIL"
+                                },
+                                onSettingsClick = {
+                                    currentScreen = "SETTINGS"
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -164,3 +201,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

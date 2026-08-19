@@ -23,6 +23,8 @@ fun TacticalSettingsScreen(
     onChannelNameChanged: (String) -> Unit,
     currentPsk: String,
     onPskChanged: (String) -> Unit,
+    relayEnabled: Boolean = true,
+    onRelayEnabledChanged: (Boolean) -> Unit = {},
     onBackClick: () -> Unit,
     onExitClick: () -> Unit
 ) {
@@ -135,6 +137,50 @@ fun TacticalSettingsScreen(
                 .border(1.dp, TacticalColors.OliveDrab)
                 .padding(12.dp)
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "ROUTING & MESH",
+            color = TacticalColors.Tan,
+            fontFamily = CondensedFontFamily,
+            fontSize = 14.sp,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onRelayEnabledChanged(!relayEnabled) }
+                .background(TacticalColors.Panel)
+                .border(1.dp, TacticalColors.OliveDrab)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (relayEnabled) "[X]" else "[ ]",
+                color = TacticalColors.Amber,
+                fontFamily = CondensedFontFamily,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+            Column {
+                Text(
+                    text = "AUTOMATISCHES MESH-RELAY (REPEATER)",
+                    color = TacticalColors.TextPrimary,
+                    fontFamily = CondensedFontFamily,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Leitet fremde Pakete mit hop_limit > 0 weiter",
+                    color = TacticalColors.Tan,
+                    fontFamily = CondensedFontFamily,
+                    fontSize = 12.sp
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 

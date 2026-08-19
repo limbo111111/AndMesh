@@ -42,7 +42,14 @@ object TacticalColors {
 val StencilFontFamily = FontFamily(Font(R.font.big_shoulders_stencil, FontWeight.Bold))
 val CondensedFontFamily = FontFamily(Font(R.font.barlow_condensed, FontWeight.Normal))
 
-data class MeshNode(val name: String, val hopsLabel: String, val statusLabel: String = "")
+data class MeshNode(
+    val nodeId: Long,
+    val name: String,
+    val hexId: String = "",
+    val hopsLabel: String,
+    val statusLabel: String = "",
+    val isFavorite: Boolean = false
+)
 
 @Composable
 fun TacticalMainScreen(
@@ -54,6 +61,7 @@ fun TacticalMainScreen(
     nodes: List<MeshNode>,
     messages: List<MeshMessage>,
     onSendClick: (String) -> Unit,
+    onNodeClick: (Long) -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
     Column(
@@ -79,7 +87,9 @@ fun TacticalMainScreen(
                     .weight(0.4f)
                     .padding(horizontal = 14.dp)
             ) {
-                items(nodes) { node -> RosterRow(node) }
+                items(nodes) { node ->
+                    RosterRow(node = node, onClick = { onNodeClick(node.nodeId) })
+                }
             }
 
             Text(
@@ -186,8 +196,12 @@ private fun BriefRow(label: String, value: String) {
 }
 
 @Composable
-private fun RosterRow(node: MeshNode) {
-    Column {
+private fun RosterRow(node: MeshNode, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -195,17 +209,27 @@ private fun RosterRow(node: MeshNode) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    node.name.uppercase(),
-                    color = TacticalColors.TextPrimary,
-                    fontFamily = CondensedFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
-                )
-                if (node.statusLabel.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (node.isFavorite) {
                     Text(
-                        node.statusLabel.uppercase(),
+                        "★",
+                        color = TacticalColors.Amber,
+                        fontSize = 14.sp
+                    )
+                }
+                Column {
+                    Text(
+                        node.name.uppercase(),
+                        color = TacticalColors.TextPrimary,
+                        fontFamily = CondensedFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        text = "${node.hexId} · ${node.statusLabel}".uppercase(),
                         color = TacticalColors.Tan,
                         fontFamily = CondensedFontFamily,
                         fontSize = 11.sp

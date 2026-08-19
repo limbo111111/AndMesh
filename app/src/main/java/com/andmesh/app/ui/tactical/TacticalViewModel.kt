@@ -1,97 +1,127 @@
 package com.andmesh.app.ui.tactical
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import com.andmesh.app.data.local.entity.MessageEntity
+import com.andmesh.app.data.local.entity.NodeEntity
+import com.andmesh.app.data.repository.MeshRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
-data class MeshMessage(val fromNode: String, val text: String)
-
-data class NodeState(val id: String, val name: String, val hops: Int, var lastHeard: Long)
+data class MeshMessage(
+    val id: Long,
+    val fromNode: String,
+    val text: String,
+    val timestamp: Long,
+    val isOutgoing: Boolean,
+    val hopLimit: Int
+)
 
 data class TacticalState(
     val nodes: List<MeshNode> = emptyList(),
-    val messages: List<MeshMessage> = emptyList()
+    val rawNodes: List<NodeEntity> = emptyList(),
+    val messages: List<MeshMessage> = emptyList(),
+    val selectedNode: NodeEntity? = null,
+    val selectedNodeMessages: List<MessageEntity> = emptyList()
 )
 
-class TacticalViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(TacticalState())
-    val uiState: StateFlow<TacticalState> = _uiState.asStateFlow()
+class TacticalViewModel(private val repository: MeshRepository) : ViewModel() {
 
-    private val nodesMap = mutableMapOf<String, NodeState>()
+    private val _selectedNodeId = MutableStateFlow<Long?>(null)
+    val selectedNodeId: StateFlow<Long?> = _selectedNodeId.asStateFlow()
 
-    init {
-        // Periodic updates for time since last heard
-        viewModelScope.launch {
-            while (true) {
-                updateNodesUI()
-                delay(10000) // Update every 10 seconds
-            }
-        }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val _selectedNode = _selectedNodeId.flatMapLatest { id ->
+        if (id != null) repository.getNodeById(id) else flowOf(null)
     }
 
-    private fun updateNodesUI() {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val _selectedNodeMessages = _selectedNodeId.flatMapLatest { id ->
+        if (id != null) repository.getMessagesForNode(id) else flowOf(emptyList())
+    }
+
+    val uiState: StateFlow<TacticalState> = combine(
+        repository.allNodes,
+        repository.allMessages,
+        _selectedNode,
+        _selectedNodeMessages
+    ) { nodes, messages, selectedNode, nodeMessages ->
         val now = System.currentTimeMillis()
-        val displayNodes = nodesMap.values.sortedByDescending { it.lastHeard }.map { entity ->
+        val displayNodes = nodes.map { entity ->
             val elapsedMs = now - entity.lastHeard
             val statusLabel = when {
                 elapsedMs < 60_000 -> "ONLINE"
                 elapsedMs < 3600_000 -> "SEEN ${elapsedMs / 60_000} MIN AGO"
                 else -> "SEEN ${elapsedMs / 3600_000} HR AGO"
             }
-            MeshNode(entity.name, "${entity.hops} HOPS", statusLabel)
+            MeshNode(
+                nodeId = entity.nodeId,
+                name = entity.longName,
+                hexId = entity.hexId,
+                hopsLabel = "${entity.hopsAway} HOPS",
+                statusLabel = statusLabel,
+                isFavorite = entity.isFavorite
+            )
         }
-        _uiState.update { it.copy(nodes = displayNodes) }
+
+        val displayMessages = messages.map { entity ->
+            MeshMessage(
+                id = entity.id,
+                fromNode = if (entity.isOutgoing) "LOKAL" else entity.fromNodeName,
+                text = entity.text,
+                timestamp = entity.timestamp,
+                isOutgoing = entity.isOutgoing,
+                hopLimit = entity.hopLimit
+            )
+        }
+
+        TacticalState(
+            nodes = displayNodes,
+            rawNodes = nodes,
+            messages = displayMessages,
+            selectedNode = selectedNode,
+            selectedNodeMessages = nodeMessages
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = TacticalState()
+    )
+
+    fun selectNode(nodeId: Long?) {
+        _selectedNodeId.value = nodeId
     }
 
-    fun onPacketReceived(jsonString: String) {
+    fun sendLocalMessage(text: String, fromNodeId: Int, toNodeId: Long = 0xFFFFFFFFL) {
         viewModelScope.launch {
-            try {
-                val json = JSONObject(jsonString)
-                if (json.has("error")) {
-                    Log.e("TacticalViewModel", "Error in packet: ${json.getString("error")}")
-                    return@launch
-                }
-
-                val from = json.getLong("from")
-                val fromName = "Node ${from.toString(16).uppercase()}"
-                val idStr = from.toString()
-
-                // Update or add node to memory map
-                nodesMap[idStr] = NodeState(
-                    id = idStr,
-                    name = fromName,
-                    hops = 0, // Hardcoded for now
-                    lastHeard = System.currentTimeMillis()
-                )
-                updateNodesUI()
-
-                // Check for text message
-                if (json.has("payload_text") && !json.isNull("payload_text")) {
-                    val text = json.getString("payload_text")
-                    _uiState.update { state ->
-                        val newMessages = listOf(MeshMessage(fromName, text)) + state.messages
-                        state.copy(messages = newMessages.take(50)) // Keep last 50 messages
-                    }
-                }
-
-            } catch (e: Exception) {
-                Log.e("TacticalViewModel", "Failed to parse JSON packet", e)
-            }
+            val fromName = "Node ${fromNodeId.toString(16).uppercase()}"
+            val message = MessageEntity(
+                packetId = kotlin.random.Random.nextLong(),
+                fromNodeId = fromNodeId.toLong(),
+                fromNodeName = fromName,
+                toNodeId = toNodeId,
+                channelName = "LongFast",
+                portNum = 1,
+                text = text,
+                timestamp = System.currentTimeMillis(),
+                isOutgoing = true,
+                hopLimit = 3,
+                hopStart = 3
+            )
+            repository.insertMessage(message)
         }
     }
 
-    fun sendLocalMessage(text: String, nodeId: Int) {
-        val fromName = "Node ${nodeId.toString(16).uppercase()}"
-        _uiState.update { state ->
-            val newMessages = listOf(MeshMessage(fromName, text)) + state.messages
-            state.copy(messages = newMessages.take(50)) // Keep last 50 messages
+    fun toggleFavorite(nodeId: Long, isFavorite: Boolean) {
+        viewModelScope.launch {
+            repository.setNodeFavorite(nodeId, isFavorite)
+        }
+    }
+
+    fun updateNotes(nodeId: Long, notes: String) {
+        viewModelScope.launch {
+            repository.updateNodeNotes(nodeId, notes)
         }
     }
 }

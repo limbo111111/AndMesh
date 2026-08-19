@@ -11,6 +11,15 @@ object RtlSdrNative {
     external fun setFrequencyHz(freqHz: Long)
     external fun setChannel(channelName: String, psk: ByteArray)
     external fun encodeTextMessage(text: String, fromNodeId: Int): ByteArray
+    external fun encodeMeshPacket(
+        to: Long,
+        from: Long,
+        id: Long,
+        hopLimit: Int,
+        hopStart: Int,
+        portnum: Int,
+        payloadBytes: ByteArray
+    ): ByteArray
 
     var packetListener: ((String) -> Unit)? = null
 

@@ -13,11 +13,20 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 
+import com.andmesh.app.data.local.AppDatabase
+import com.andmesh.app.data.repository.MeshRepository
+import com.andmesh.app.mesh.MeshRouter
+
 class MeshSdrService : Service() {
 
     private val binder = LocalBinder()
     var hackRfRepository: HackRfRepository? = null
         private set
+    lateinit var meshRepository: MeshRepository
+        private set
+    lateinit var meshRouter: MeshRouter
+        private set
+
     var isDeviceReady = false
         private set
 
@@ -32,6 +41,14 @@ class MeshSdrService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForegroundService()
+
+        val db = AppDatabase.getInstance(this)
+        meshRepository = MeshRepository(db)
+        meshRouter = MeshRouter(this, meshRepository) { hackRfRepository }
+
+        RtlSdrNative.packetListener = { packetJson ->
+            meshRouter.onPacketReceived(packetJson)
+        }
 
         // Initialize hardware
         hackRfRepository = HackRfRepository(

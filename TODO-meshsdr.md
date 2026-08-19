@@ -33,21 +33,20 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 - Reihenfolge: RX zuerst gegen echte HackRF-Aufnahmen testen, TX erst danach versuchen.
 
 ## Integration & UI
-- ✅ `lib.rs`: JNI-Brücke ist vollständig, dekodierte JSON-Daten werden per JNI an `RtlSdrNative.onPacketDecoded` an die Kotlin-UI weitergegeben.
-- ✅ `MeshSdrService.kt`: `HackRfRepository` ist eingebunden und initialisiert.
-- ✅ `TacticalMainScreen.kt`: Nutzt jetzt dynamische Daten (Nodes/Messages) via `TacticalViewModel` statt Hardcodes.
-- ✅ Weitere Screens im Aussehen-#2-Look: Nachrichten-Thread (im Main integriert)
-- ✅ Kanal-/PSK-Einstellungen (`TacticalSettingsScreen` bietet aktuell Frequenz und Kanal/PSK-Eingabe).
-- ✅ Echtes Notification-Icon statt Platzhalter (aktuell `ic_menu_compass`)
+- ✅ `lib.rs`: JNI-Brücke ist vollständig, dekodierte JSON-Daten werden per JNI an `RtlSdrNative.onPacketDecoded` an die Kotlin-UI weitergegeben (inklusive Position, User/NodeInfo, Telemetrie).
+- ✅ `MeshSdrService.kt`: `HackRfRepository`, `AppDatabase`, `MeshRepository` und `MeshRouter` sind eingebunden und initialisiert.
+- ✅ `TacticalMainScreen.kt`: Nutzt jetzt dynamische Daten (Nodes/Messages) via `TacticalViewModel` und Room Flow.
+- ✅ `TacticalNodeDetailScreen.kt`: Vollwertiger Tactical-Detail-Bildschirm für Stationen (GPS-Koordinaten, Telemetrie/Akku/Spannung, Hardware-Modell, direkte Chat-History, Favoriten-Toggle und Notizen).
+- ✅ Kanal-/PSK- & Routing-Einstellungen (`TacticalSettingsScreen` bietet Frequenz, Kanal/PSK-Eingabe und Mesh-Relay/Repeater Toggle).
+- ✅ Echtes Notification-Icon (`ic_mesh_notification`).
 - ✅ `AndroidManifest.xml`: Service mit `foregroundServiceType="connectedDevice"` und USB-Host-Features sind eingerichtet.
-- ✅ Frequenz/Region konfigurierbar machen (JNI und HackRfRepository unterstützen nun dynamische Frequenz).
+- ✅ Frequenz/Region konfigurierbar machen (JNI und HackRfRepository unterstützen dynamische Frequenz).
 
-## Noch gar nicht angefangen
-- ❌ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `NodeEntity`).
+## Persistenz & Routing
+- ✅ Node-Datenbank/Persistenz (Room implementiert über `AppDatabase`, `NodeDao`, `MessageDao`, `NodeEntity`, `MessageEntity`, `MeshRepository`).
+- ✅ Flood-Routing & Deduplizierung (implementiert über `MeshRouter` mit LRU-Cache, Hop-Dekrementierung und Jitter-Queue).
 - ✅ USB-Berechtigungsdialog (via `hackrf_android` / Manifest intent-filter).
 - ✅ Android 13+ Notification-Runtime-Permission
-- ❌ Flood-Routing, falls "vollwertiger" Routing-Node gewünscht (aktuell nur
-  Senden/Empfangen eigener Nachrichten geplant)
 
 ## Kann in dieser Sandbox grundsätzlich nicht passieren
 - ❌ Hardware-Test gegen echtes HackRF / echten Meshtastic-Traffic

@@ -165,12 +165,19 @@ class HackRfRepository(
     }
 
     fun sendTextMessage(text: String, fromNodeId: Int) {
+        val rawBytes = RtlSdrNative.encodeTextMessage(text, fromNodeId)
+        if (rawBytes.isNotEmpty()) {
+            sendRawIqBytes(rawBytes)
+        }
+    }
+
+    fun sendRawIqBytes(rawBytes: ByteArray) {
         synchronized(hackrfLock) {
             if (hackrf == null) return
 
             val currentTime = System.currentTimeMillis()
-            if (currentTime - lastTxTime < 10000) {
-                Log.w("HackRfRepository", "TX Cooldown active. Dropping message.")
+            if (currentTime - lastTxTime < 3000) {
+                Log.w("HackRfRepository", "TX Cooldown active. Dropping transmission.")
                 return
             }
             lastTxTime = currentTime
@@ -178,12 +185,10 @@ class HackRfRepository(
             thread(start = true) {
                 synchronized(hackrfLock) {
                     try {
-                        // Determine a reasonable TX gain start value, acting as a tuning parameter
                         hackrf?.setTxVGAGain(32)
 
                         val wasReceiving = isReceiving
                         if (isReceiving) {
-                            // Directly stop to not deadlock on inner synchronized if stopReceiving is used
                             isReceiving = false
                             try {
                                 hackrf?.stop()
@@ -199,10 +204,7 @@ class HackRfRepository(
                             return@thread
                         }
 
-                        // Call Rust to encode the packet (returns interleaved i8 samples as ByteArray)
-                        val rawBytes = RtlSdrNative.encodeTextMessage(text, fromNodeId)
-
-                        val packetSize = hackrf?.getPacketSize() ?: 262144 // Fallback if not available
+                        val packetSize = hackrf?.getPacketSize() ?: 262144
 
                         var offset = 0
                         while (offset < rawBytes.size) {
@@ -211,7 +213,6 @@ class HackRfRepository(
                                 val chunkLength = kotlin.math.min(packetSize, rawBytes.size - offset)
                                 System.arraycopy(rawBytes, offset, buffer, 0, chunkLength)
 
-                                // If chunk is smaller than buffer size, zero the rest
                                 if (chunkLength < buffer.size) {
                                     buffer.fill(0.toByte(), chunkLength, buffer.size)
                                 }
@@ -219,16 +220,14 @@ class HackRfRepository(
                                 txQueue?.put(buffer)
                                 offset += chunkLength
                             } else {
-                                // wait a bit for buffer to become available
                                 Thread.sleep(10)
                             }
                         }
 
-                        Thread.sleep(500) // allow time to send
+                        Thread.sleep(500)
                         hackrf?.stop()
                         txQueue = null
 
-                        // Restart RX if we were receiving
                         if (wasReceiving) {
                             try {
                                 rxQueue = hackrf?.startRX()
@@ -251,7 +250,7 @@ class HackRfRepository(
                             }
                         }
                     } catch (e: Exception) {
-                        Log.e("HackRfRepository", "Error sending TX message", e)
+                        Log.e("HackRfRepository", "Error sending TX buffer", e)
                     }
                 }
             }
