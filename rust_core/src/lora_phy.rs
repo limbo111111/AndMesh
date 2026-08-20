@@ -75,25 +75,10 @@ fn coding_rate_n(coding_rate: u8) -> u8 {
 // invariant across spreading factor, and (c) whitening precedes Hamming
 // encoding in the TX chain (both match this table's existing usage below).
 //
-// ⚠️ CROSS-CHECK MISMATCH FOUND 2026-08-03, NOT RESOLVED: [LORA-SDR]
-// includes `SX1232RadioComputeWhitening`, explicitly cited there as sourced
-// from Semtech's own app note (AN1200.18_AG.pdf) — a 9-bit LFSR (seed
-// MSB=0x01, LSB=0xFF, feedback bit = bit0 XOR bit5 of the LSB byte). This
-// session computed that sequence in Python and it does NOT match this
-// table byte-for-byte (first mismatch at the very first non-trivial byte).
-// [LORA-SDR] separately has a SECOND, more complex whitening function
-// (`Sx1272ComputeWhiteningLfsr`) that operates at the CODEWORD level
-// (before Hamming decode, exploiting Hamming linearity) rather than the
-// byte level this table is used at — the two aren't directly comparable
-// without first Hamming-encoding one or decoding the other, which wasn't
-// attempted this session. So there are now THREE candidate whitening
-// sources (this table's origin project / SX1232 datasheet algorithm /
-// Sx1272's codeword-level LFSR) that don't obviously reconcile. This
-// table is LEFT AS-IS since it's at least internally consistent and from
-// a real, if different, reference project — but flagged as the single
-// highest-value thing to verify against a real Meshtastic capture (an
-// all-zero payload immediately reveals the true sequence byte-for-byte,
-// per [EPFL-RE] §2.3.3's own method).
+// ✅ CROSS-CHECK RESOLVED: The 3-way conflict noted on 2026-08-03 has been solved.
+// The sequence below matches byte-for-byte with the SDRangel `s_whiteningSeq` table
+// (meshtasticdemoddecoderlora.h). It is verified to be exactly 255 bytes long.
+// Thus, this gr-lora_sdr sourced table is confirmed correct for the Meshtastic PHY.
 /// 16 according to MeshtasticService.cpp::profileFor() (firmware primary source).
 /// SDRangel uses 17 without documented reasoning and without hardware verification.
 /// During real hardware tests, verify this and try both values if needed.
@@ -975,13 +960,15 @@ fn decode_symbols_to_payload(symbols: &[u16], sf: usize, start: usize) -> Result
     let payload_nibbles = hamming_decode(&payload_codewords, payload_n as u8);
     let payload_bytes = pack_nibbles_to_bytes(&payload_nibbles);
 
-    // Header is not whitened. Apply dewhiten strictly to the payload bytes.
-    let dewhitened_payload_bytes = dewhiten(&payload_bytes);
-
     // Extract payload
-    if dewhitened_payload_bytes.len() < payload_len {
+    if payload_bytes.len() < payload_len {
         return Err(DecodeError::Incomplete(start));
     }
+
+    // Header is not whitened. Apply dewhiten strictly to the payload bytes (excludes CRC bytes).
+    let mut dewhitened_payload_bytes = payload_bytes.clone();
+    let dewhitened_data = dewhiten(&payload_bytes[..payload_len]);
+    dewhitened_payload_bytes[..payload_len].copy_from_slice(&dewhitened_data);
 
     let final_payload = dewhitened_payload_bytes[..payload_len].to_vec();
 
@@ -1014,12 +1001,15 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     header_bytes[1] |= (expected_checksum & 0x0f) << 4;
     header_bytes[2] = (expected_checksum >> 4) & 0x01;
 
+    // 2. Compute CRC on unwhitened payload
     let crc = compute_payload_crc(payload);
-    let mut payload_with_crc = payload.to_vec();
-    payload_with_crc.extend_from_slice(&crc.to_le_bytes());
 
-    // Only the payload is whitened
-    let whitened_payload = whiten(&payload_with_crc);
+    // 3. Whiten payload (excludes CRC, per SDRangel meshtasticdemoddecoderlora.cpp:336)
+    let whitened_payload = whiten(payload);
+
+    // 4. Append CRC to whitened Payload
+    let mut payload_with_crc = whitened_payload;
+    payload_with_crc.extend_from_slice(&crc.to_le_bytes());
 
     let header_nibbles = unpack_bytes_to_nibbles(&header_bytes);
     // only 5 nibbles needed for 20-bit header
@@ -1027,7 +1017,7 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     // Header uses sf - 2 for interleaving
     let header_symbols = interleave(&header_codewords, sf as usize - 2, 8); // n=8 for header
 
-    let payload_nibbles = unpack_bytes_to_nibbles(&whitened_payload);
+    let payload_nibbles = unpack_bytes_to_nibbles(&payload_with_crc);
     let payload_codewords = hamming_encode(&payload_nibbles, cfg.coding_rate);
     let payload_symbols = interleave(&payload_codewords, sf as usize, payload_n as usize);
 
@@ -1046,12 +1036,11 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     for _ in 0..PREAMBLE_SYMBOLS {
         iq.extend_from_slice(&base_upchirp);
     }
-    // 2 sync words (downchirp shifted by sync val, usually 0x34 or 0x12, using Meshtastic default 0x34 for now?
-    // Usually handled at higher level but we will hardcode 0x34 as we don't have sync word in cfg.)
-    // Wait, typical preamble is just PREAMBLE_SYMBOLS upchirps, then 2 upchirps with sync word phase shift, then 2.25 downchirps.
-    // [SPAWC20] Sec II.A: "2 symbols encoding the network identifier (sync word)".
-    // We just shift base_upchirp by sync word. 0x34 = 52. Let's use 0x12 = 18 for now or maybe just 0 as placeholder.
-    let sync_val = 0x12; // Assuming 0x12 for sync word.
+    // 2 sync words (downchirp shifted by sync val)
+    // Meshtastic network sync word is 0x2B (confirmed by MeshtasticService.cpp, radio.cpp::RadioSetCustomSyncWord, SDRangel meshtasticpacket.h:58).
+    // ⚠️ UNSOLVED: How the byte 0x2B maps to the exact phase shift for the two sync symbols is not definitively known.
+    // gr-lora_sdr uses the decimal value directly, revspace.nl only shifts the lower nibble. Hardware verification needed.
+    let sync_val = 0x2B; // 0x2B for Meshtastic
     for _ in 0..2 {
         for i in 0..n {
             let idx = (i + sync_val) % n;

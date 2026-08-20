@@ -26,7 +26,8 @@ Alles hier basiert auf dem, was in der Codebasis tatsächlich geprüft/gebaut/vo
 - ✅ Deinterleaver
 - ✅ Hamming-Decode
 - ✅ Dewhitening
-- ✅ Header-Parsing + CRC (Parsing existiert und CRC-Prüfung in `try_decode_packet` ist aktiv, liefert `None` bei Fehler)
+- ✅ Header-Parsing + CRC (Parsing existiert, CRC-Prüfung in `try_decode_packet` ist aktiv und liefert `Result<Vec<u8>, DecodeError>`)
+- ⚠️ Sync-Wort (0x2B) -> Symbol-Übersetzung: Unsicherheit bei der Abbildung des Bytes auf die zwei Sync-Symbole (Hardware-Verifikation nötig).
 - ✅ RX-Architektur: `try_decode_packet` implementiert einen "Two-Phase Decode" (zuerst Header mit CR=4/8, dann Payload basierend auf den Header-Parametern).
 - ✅ TX-Pfad (Pipeline umgekehrt) — vollständig implementiert (inklusive generate_upchirp, whiten, crc, encode, interleave, gray_map, modulate).
 - Alle Konstanten (Interleaver/Whitening/Hamming) aus gr-lora_sdr portiert.
