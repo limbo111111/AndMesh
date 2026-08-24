@@ -1,0 +1,54 @@
+name: gr-lora_sdr Reference Fixtures
+
+# UNVERIFIED: Dieser Workflow wurde von Claude anhand der offiziellen
+# tapparelj/gr-lora_sdr-Doku (Conda-Installationsweg) entworfen, aber nicht
+# selbst ausgeführt (kein Netzwerkzugriff im Audit-Sandbox). Der
+# Conda-Installationsbefehl ist aus der echten README zitiert, das
+# Gesamt-Setup (insb. ob die Python-API in dieser Umgebung so importierbar
+# ist) muss beim ersten Lauf verifiziert werden.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: latest
+          channels: conda-forge
+
+      - name: Install gr-lora_sdr (from tapparelj's Anaconda channel)
+        shell: bash -l {0}
+        run: conda install -y -c tapparelj -c conda-forge gnuradio-lora_sdr
+
+      - name: Install Python crypto dep (for gen_meshtastic_iq.py)
+        shell: bash -l {0}
+        run: pip install cryptography
+
+      - name: Run TX stage dump (ground truth for Whitening/Hamming/Interleaving)
+        # Text is 255 bytes (0-9A-Za-z repeating) -- NOT the original 3-byte "ABC".
+        # WHITENING_SEQ is a 255-byte table applied by running index against the
+        # payload; a 3-byte input only exercises indices 0-2 and proves nothing
+        # about the other 252 bytes. Caught by Jules during task review.
+        shell: bash -l {0}
+        run: |
+          cd tools/gr_lora_sdr_reference
+          python3 lora_stage_dump.py --outdir ../../rust_core/tests/fixtures/lora_stages --text "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456" --sf 11 --cr 5 --bw 250000
+
+      - name: Run full-frame IQ generator (known-plaintext end-to-end test vector)
+        shell: bash -l {0}
+        run: |
+          cd tools/gr_lora_sdr_reference
+          python3 gen_meshtastic_iq.py --out ../../rust_core/tests/fixtures/meshtastic_test.cf32 --text "Hello" --sf 11 --cr 5 --bw 250000
+
+      - name: Upload fixtures as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lora-reference-fixtures
+          path: rust_core/tests/fixtures/

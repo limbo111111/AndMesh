@@ -1036,14 +1036,23 @@ pub fn encode_packet(payload: &[u8], cfg: &LoraConfig) -> Vec<Complex32> {
     for _ in 0..PREAMBLE_SYMBOLS {
         iq.extend_from_slice(&base_upchirp);
     }
-    // 2 sync words (downchirp shifted by sync val)
+    // 2 sync words
     // Meshtastic network sync word is 0x2B (confirmed by MeshtasticService.cpp, radio.cpp::RadioSetCustomSyncWord, SDRangel meshtasticpacket.h:58).
-    // ⚠️ UNSOLVED: How the byte 0x2B maps to the exact phase shift for the two sync symbols is not definitively known.
-    // gr-lora_sdr uses the decimal value directly, revspace.nl only shifts the lower nibble. Hardware verification needed.
-    let sync_val = 0x2B; // 0x2B for Meshtastic
-    for _ in 0..2 {
+    // ✅ SOLVED 2026-08-23: Empirically verified against gr-lora_sdr:
+    // The sync byte is split into upper and lower nibbles. Each nibble is multiplied by `1 << (sf - 8)`.
+    // NOTE: This scaling formula `1 << (sf - 8)` is extrapolated from the SF11 test, and has not been tested at other spreading factors!
+    // For Meshtastic, the config byte is 0x12.
+    // - Sync word 0 shift: (0x12 >> 4) * (1 << (sf - 8)) -> tested on SF11: bin 8
+    // - Sync word 1 shift: (0x12 & 0x0F) * (1 << (sf - 8)) -> tested on SF11: bin 16
+    // Tests with 0x34 yielded bin 24 and 32 respectively.
+    // The sync words themselves are UPCHIRPS.
+    let sync_val = 0x12; // Meshtastic default
+    let sync_shift_0 = (sync_val >> 4) as usize * (1_usize << (sf - 8));
+    let sync_shift_1 = (sync_val & 0x0F) as usize * (1_usize << (sf - 8));
+
+    for &sync_shift in &[sync_shift_0, sync_shift_1] {
         for i in 0..n {
-            let idx = (i + sync_val) % n;
+            let idx = (i + sync_shift) % n;
             iq.push(base_upchirp[idx]);
         }
     }
