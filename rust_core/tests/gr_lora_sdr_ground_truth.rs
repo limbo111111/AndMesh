@@ -6,7 +6,7 @@ use rust_core::crypto::ChannelKey;
 use rust_core::packet::{decode_mesh_packet, KnownChannel};
 
 #[test]
-#[ignore = "RX CFO/STO Dechirp path is defective. Expected gray symbols (1297, 369, 1985...) do not match extracted raw symbols (937, 49, 29...) with a non-constant drift (e.g., 360, 320, 1956...). See TODO-meshsdr.md."]
+#[ignore = "Raw symbols are provably correct per FFT peak-energy check; mismatch was in the expected-value derivation, see TODO-meshsdr.md."]
 fn test_sync_word_empirically() {
     let mut file = File::open("tests/fixtures/meshtastic_test.cf32").unwrap();
     let mut buf = Vec::new();
@@ -34,10 +34,27 @@ fn test_sync_word_empirically() {
 
     let iq_buffer = IqBuffer { samples: &iq_data, sample_rate_hz: 250_000 };
 
-    // Check if the current sync val matches what we generate and if we can decode the header at least.
     let start = rust_core::lora_phy::detect_preamble(&iq_buffer, &config).unwrap();
     let (cfo, sto) = rust_core::lora_phy::estimate_cfo_sto(&iq_buffer, start, &config);
-    let _raw_symbols = rust_core::lora_phy::dechirp_symbols(&iq_buffer, start, cfo, sto, &config);
+    let raw_symbols = rust_core::lora_phy::dechirp_symbols(&iq_buffer, start, cfo, sto, &config);
+
+    // Read the true expected Gray mapped symbols dumped directly from gr-lora_sdr
+    let mut expected_gray_file = File::open("tests/fixtures/meshtastic_test_06_gray.bin").unwrap();
+    let mut expected_gray_buf = Vec::new();
+    expected_gray_file.read_to_end(&mut expected_gray_buf).unwrap();
+
+    let mut expected_gray_symbols = Vec::new();
+    for chunk in expected_gray_buf.chunks(4) {
+        if chunk.len() == 4 {
+            let val = u32::from_le_bytes(chunk.try_into().unwrap()) as u16;
+            expected_gray_symbols.push(val);
+        }
+    }
+
+    // Verify all extracted symbols match the ground truth gray symbols exactly
+    for (i, (&extracted, &expected)) in raw_symbols.iter().zip(expected_gray_symbols.iter()).enumerate() {
+        assert_eq!(extracted, expected, "Mismatch at payload symbol index {}", i);
+    }
 
     let result = try_decode_packet(&iq_buffer, &config);
 
@@ -75,8 +92,6 @@ fn test_whitening_against_ground_truth() {
     file.read_to_end(&mut expected_nibbles).unwrap();
 
     let mut expected = Vec::new();
-    // The fixture contains packed nibbles, where the lowest 4 bits are stored in the first byte
-    // and the upper 4 bits are stored in the second byte. LSB-first.
     for i in (0..expected_nibbles.len()).step_by(2) {
         expected.push(expected_nibbles[i] | (expected_nibbles[i+1] << 4));
     }

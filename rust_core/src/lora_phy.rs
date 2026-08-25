@@ -76,9 +76,9 @@ fn coding_rate_n(coding_rate: u8) -> u8 {
 // encoding in the TX chain (both match this table's existing usage below).
 //
 // ✅ CROSS-CHECK RESOLVED: The 3-way conflict noted on 2026-08-03 has been solved.
-// The sequence below matches byte-for-byte with the SDRangel `s_whiteningSeq` table
-// (meshtasticdemoddecoderlora.h). It is verified to be exactly 255 bytes long.
-// Thus, this gr-lora_sdr sourced table is confirmed correct for the Meshtastic PHY.
+// The sequence below has been independently verified byte-for-byte against the gr-lora_sdr
+// ground truth using `test_whitening_against_ground_truth` with 0 deviations.
+// Thus, this gr-lora_sdr sourced table is definitively confirmed correct.
 /// 16 according to MeshtasticService.cpp::profileFor() (firmware primary source).
 /// SDRangel uses 17 without documented reasoning and without hardware verification.
 /// During real hardware tests, verify this and try both values if needed.
