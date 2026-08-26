@@ -17,10 +17,4 @@ interface MessageDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity): Long
-
-    @Query("DELETE FROM messages WHERE fromNodeId = :nodeId OR toNodeId = :nodeId")
-    suspend fun deleteMessagesForNode(nodeId: Long)
-
-    @Query("DELETE FROM messages")
-    suspend fun clearAllMessages()
 }

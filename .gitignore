@@ -7,3 +7,5 @@ local.properties
 rust_core/target/
 app/src/main/jniLibs/
 rust_core/build/
+*.log
+*output.txt

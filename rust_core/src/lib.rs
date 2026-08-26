@@ -9,12 +9,13 @@ use packet::proto::mesh_packet::PayloadVariant;
 use serde::Serialize;
 use std::panic;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 static CURRENT_FREQ_HZ: AtomicU64 = AtomicU64::new(869_525_000);
 
-lazy_static::lazy_static! {
-    static ref CURRENT_CHANNEL: Mutex<(String, Vec<u8>)> = Mutex::new(("LongFast".to_string(), vec![1]));
+fn current_channel() -> &'static Mutex<(String, Vec<u8>)> {
+    static CHANNEL: OnceLock<Mutex<(String, Vec<u8>)>> = OnceLock::new();
+    CHANNEL.get_or_init(|| Mutex::new(("LongFast".to_string(), vec![1])))
 }
 
 #[no_mangle]
@@ -40,12 +41,13 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_setChannel(
         };
         let psk_bytes = env.convert_byte_array(psk).unwrap_or_else(|_| vec![1]);
 
-        if let Ok(mut channel) = CURRENT_CHANNEL.lock() {
+        if let Ok(mut channel) = current_channel().lock() {
             channel.0 = ch_name_str;
             channel.1 = psk_bytes;
         }
     }));
 }
+
 
 #[derive(Serialize)]
 struct DecodedPacketJson {
@@ -102,7 +104,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
             Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
         let (ch_name, ch_psk) = {
-            if let Ok(channel) = CURRENT_CHANNEL.lock() {
+            if let Ok(channel) = current_channel().lock() {
                 (channel.0.clone(), channel.1.clone())
             } else {
                 ("LongFast".to_string(), vec![1])
@@ -144,7 +146,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeTextMessage(
 
 #[no_mangle]
 pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeMeshPacket(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     to: jni::sys::jlong,
     from: jni::sys::jlong,
@@ -173,7 +175,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_encodeMeshPacket(
             Some(packet::proto::mesh_packet::PayloadVariant::Decoded(data));
 
         let (ch_name, ch_psk) = {
-            if let Ok(channel) = CURRENT_CHANNEL.lock() {
+            if let Ok(channel) = current_channel().lock() {
                 (channel.0.clone(), channel.1.clone())
             } else {
                 ("LongFast".to_string(), vec![1])
@@ -242,7 +244,7 @@ pub extern "system" fn Java_com_andmesh_app_RtlSdrNative_pushIqSamples(
 
             if let Ok(payload) = lora_phy::try_decode_packet(&iq_buf, &cfg) {
                 let (ch_name, ch_psk) = {
-                    if let Ok(channel) = CURRENT_CHANNEL.lock() {
+                    if let Ok(channel) = current_channel().lock() {
                         (channel.0.clone(), channel.1.clone())
                     } else {
                         ("LongFast".to_string(), vec![1])

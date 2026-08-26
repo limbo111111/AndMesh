@@ -103,20 +103,6 @@ pub const WHITENING_SEQ: [u8; 255] = [
     0xE5, 0xCA, 0x94, 0x28, 0x50, 0xA1, 0x42, 0x84, 0x09, 0x13, 0x27, 0x4F, 0x9F, 0x3F, 0x7F,
 ];
 
-// Ported from gr-lora_sdr (EPFL, GPL-3.0) hamming_dec_impl.cc: cw_LUT and cw_LUT_cr5
-// ⚠️ SUPERSEDED 2026-08-03: no longer used by hamming_decode() (see that
-// function's current doc-comment) after this session could not reconcile
-// this table's bit-ordering with a verified alternative implementation
-// ([LORA-SDR]'s decodeHamming84sx). Kept here for history/reference only —
-// do not delete without checking whether anything else still depends on it
-// (nothing in this file does, as of this rewrite).
-pub const HAMMING_LUT: [u8; 16] = [
-    0, 23, 45, 58, 78, 89, 99, 116, 139, 156, 166, 177, 197, 210, 232, 255,
-];
-pub const HAMMING_LUT_CR5: [u8; 16] = [
-    0, 24, 40, 48, 72, 80, 96, 120, 136, 144, 160, 184, 192, 216, 232, 240,
-];
-
 pub struct IqBuffer<'a> {
     pub samples: &'a [Complex32],
     pub sample_rate_hz: u32,

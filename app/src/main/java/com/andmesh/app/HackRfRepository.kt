@@ -16,8 +16,9 @@ class HackRfRepository(
 
     val nodeId: Int
 
+    private val prefs = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE)
+
     init {
-        val prefs = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE)
         if (!prefs.contains("node_id")) {
             val randomId = kotlin.random.Random.nextInt()
             prefs.edit().putInt("node_id", randomId).apply()
@@ -36,10 +37,10 @@ class HackRfRepository(
     private var lastTxTime: Long = 0
 
     // Configuration
-    var frequencyHz = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getLong("frequency_hz", 869525000L)
+    var frequencyHz = prefs.getLong("frequency_hz", 869525000L)
         set(value) {
             field = value
-            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putLong("frequency_hz", value).apply()
+            prefs.edit().putLong("frequency_hz", value).apply()
             if (isReceiving) {
                 try {
                     hackrf?.setFrequency(value)
@@ -50,17 +51,17 @@ class HackRfRepository(
             }
         }
 
-    var channelName = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getString("channel_name", "LongFast") ?: "LongFast"
+    var channelName = prefs.getString("channel_name", "LongFast") ?: "LongFast"
         set(value) {
             field = value
-            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putString("channel_name", value).apply()
+            prefs.edit().putString("channel_name", value).apply()
             updateNativeChannel()
         }
 
-    var pskBase64 = context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).getString("psk_base64", "") ?: ""
+    var pskBase64 = prefs.getString("psk_base64", "") ?: ""
         set(value) {
             field = value
-            context.getSharedPreferences("AndMeshPrefs", Context.MODE_PRIVATE).edit().putString("psk_base64", value).apply()
+            prefs.edit().putString("psk_base64", value).apply()
             updateNativeChannel()
         }
 

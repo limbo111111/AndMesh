@@ -22,10 +22,6 @@ class MeshRepository(private val database: AppDatabase) {
         database.nodeDao().upsertNode(node)
     }
 
-    suspend fun updateNodeLastHeard(nodeId: Long, time: Long, hops: Int) {
-        database.nodeDao().updateLastHeard(nodeId, time, hops)
-    }
-
     suspend fun setNodeFavorite(nodeId: Long, isFavorite: Boolean) {
         database.nodeDao().setFavorite(nodeId, isFavorite)
     }
@@ -36,10 +32,5 @@ class MeshRepository(private val database: AppDatabase) {
 
     suspend fun insertMessage(message: MessageEntity): Long {
         return database.messageDao().insertMessage(message)
-    }
-
-    suspend fun clearAll() {
-        database.messageDao().clearAllMessages()
-        database.nodeDao().clearAllNodes()
     }
 }

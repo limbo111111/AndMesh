@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -272,15 +273,6 @@ private fun MessageRow(msg: MeshMessage) {
     }
 }
 
-@Composable
-private fun HorizontalDivider(color: Color) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(color)
-    )
-}
 
 @Composable
 private fun SendBar(onClick: (String) -> Unit) {

@@ -20,7 +20,6 @@ data class MeshMessage(
 
 data class TacticalState(
     val nodes: List<MeshNode> = emptyList(),
-    val rawNodes: List<NodeEntity> = emptyList(),
     val messages: List<MeshMessage> = emptyList(),
     val selectedNode: NodeEntity? = null,
     val selectedNodeMessages: List<MessageEntity> = emptyList()
@@ -78,7 +77,6 @@ class TacticalViewModel(private val repository: MeshRepository) : ViewModel() {
 
         TacticalState(
             nodes = displayNodes,
-            rawNodes = nodes,
             messages = displayMessages,
             selectedNode = selectedNode,
             selectedNodeMessages = nodeMessages
