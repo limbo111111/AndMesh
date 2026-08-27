@@ -15,7 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -244,7 +244,7 @@ private fun RosterRow(node: MeshNode, onClick: () -> Unit) {
                 fontSize = 11.sp
             )
         }
-        HorizontalDivider(color = TacticalColors.Divider)
+        Divider(color = TacticalColors.Divider)
     }
 }
 
@@ -269,7 +269,7 @@ private fun MessageRow(msg: MeshMessage) {
             fontSize = 15.sp,
             modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
         )
-        HorizontalDivider(color = TacticalColors.Divider)
+        Divider(color = TacticalColors.Divider)
     }
 }
 

@@ -75,15 +75,12 @@ fn coding_rate_n(coding_rate: u8) -> u8 {
 // invariant across spreading factor, and (c) whitening precedes Hamming
 // encoding in the TX chain (both match this table's existing usage below).
 //
-// ✅ CROSS-CHECK RESOLVED: The 3-way conflict noted on 2026-08-03 has been solved.
-// The sequence below has been independently verified byte-for-byte against the gr-lora_sdr
-// ground truth using `test_whitening_against_ground_truth` with 0 deviations.
-// Thus, this gr-lora_sdr sourced table is definitively confirmed correct.
 /// 16 according to MeshtasticService.cpp::profileFor() (firmware primary source).
 /// SDRangel uses 17 without documented reasoning and without hardware verification.
 /// During real hardware tests, verify this and try both values if needed.
 pub const PREAMBLE_SYMBOLS: u16 = 16;
 
+// verifiziert durch test_whitening_against_ground_truth gegen gr-lora_sdr-Ground-Truth, vollständiger 255-Byte-Input (nicht nur ein Präfix), 0 Abweichungen.
 pub const WHITENING_SEQ: [u8; 255] = [
     0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE1, 0xC2, 0x85, 0x0B, 0x17, 0x2F, 0x5E, 0xBC, 0x78, 0xF1, 0xE3,
     0xC6, 0x8D, 0x1A, 0x34, 0x68, 0xD0, 0xA0, 0x40, 0x80, 0x01, 0x02, 0x04, 0x08, 0x11, 0x23, 0x47,
